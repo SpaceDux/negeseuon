@@ -1,7 +1,5 @@
-import { injectable } from "tsyringe";
 import { Connector } from "./connector.abstract";
 
-@injectable()
 export class ConnectorOrchestrator {
   private connectors: Record<string, Connector<any>> = {};
 

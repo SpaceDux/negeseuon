@@ -1,4 +1,3 @@
-import "reflect-metadata"; // Required for TSyringe decorators
 import { app, BrowserWindow } from "electron";
 import path from "node:path";
 import fs from "node:fs";
