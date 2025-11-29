@@ -1,0 +1,11 @@
+{
+  "extends": "@negeseuon/typescript-config/base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "module": "CommonJS",
+    "target": "ES2022"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.vite/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+

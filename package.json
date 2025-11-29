@@ -11,10 +11,14 @@
   "devDependencies": {
     "prettier": "^3.6.2",
     "turbo": "^2.6.1",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vite": "^5.4.21"
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "superjson": "^2.2.6"
   }
 }

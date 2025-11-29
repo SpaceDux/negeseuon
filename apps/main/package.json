@@ -1,0 +1,56 @@
+{
+  "name": "@negeseuon/main",
+  "version": "1.0.0",
+  "description": "Electron main process for Negeseuon",
+  "main": ".vite/build/main.js",
+  "author": {
+    "name": "Ryan Williams",
+    "email": "ryan.a.williams@outlook.com"
+  },
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-forge start",
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "publish": "electron-forge publish",
+    "lint": "eslint --ext .ts .",
+    "build": "vite build",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@negeseuon/db": "workspace:*",
+    "@negeseuon/ui": "workspace:*",
+    "@platformatic/kafka": "^1.21.0",
+    "@trpc/server": "^10.45.2",
+    "electron-squirrel-startup": "^1.0.1",
+    "electron-trpc": "^0.7.1",
+    "reflect-metadata": "^0.2.2",
+    "tsyringe": "^4.10.0",
+    "valibot": "^1.2.0"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.10.2",
+    "@electron-forge/maker-deb": "^7.10.2",
+    "@electron-forge/maker-rpm": "^7.10.2",
+    "@electron-forge/maker-squirrel": "^7.10.2",
+    "@electron-forge/maker-zip": "^7.10.2",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.10.2",
+    "@electron-forge/plugin-fuses": "^7.10.2",
+    "@electron-forge/plugin-vite": "^7.10.2",
+    "@electron/fuses": "^1.8.0",
+    "@negeseuon/typescript-config": "workspace:*",
+    "@tailwindcss/vite": "^4.1.17",
+    "@types/electron-squirrel-startup": "^1.0.2",
+    "@types/node": "^24.10.1",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
+    "@vitejs/plugin-react": "^5.1.1",
+    "electron": "39.2.4",
+    "eslint": "^8.57.1",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "typescript": "~4.5.4",
+    "vite": "^5.4.21"
+  }
+}

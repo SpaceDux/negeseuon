@@ -1,9 +1,11 @@
 {
-  "name": "@repo/typescript-config",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@negeseuon/typescript-config",
+  "version": "0.0.1",
+  "description": "Base TypeScript configuration for ESM packages",
+  "author": "Ryan Williams",
   "license": "MIT",
-  "publishConfig": {
-    "access": "public"
-  }
+  "main": "base.json",
+  "files": [
+    "base.json"
+  ]
 }

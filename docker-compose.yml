@@ -1,0 +1,87 @@
+version: "3.8"
+
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+      - "9094:9094"
+    volumes:
+      - ./kafka-jaas.conf:/etc/kafka/kafka-jaas.conf
+    environment:
+      KAFKA_BROKER_ID: 1
+      # Use KRaft mode (no Zookeeper)
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: SASL_PLAINTEXT://0.0.0.0:9092,SASL_PLAINTEXT_INTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: SASL_PLAINTEXT://localhost:9092,SASL_PLAINTEXT_INTERNAL://kafka:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_PLAINTEXT_INTERNAL:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: SASL_PLAINTEXT
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/kafka-jaas.conf
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    networks:
+      - kafka-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "echo 'security.protocol=SASL_PLAINTEXT\nsasl.mechanism=PLAIN\nsasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username=\"admin\" password=\"admin-secret\";' > /tmp/healthcheck.properties && timeout 10 kafka-broker-api-versions --bootstrap-server localhost:9092 --command-config /tmp/healthcheck.properties > /dev/null 2>&1 || exit 1",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./kafka-jaas.conf:/etc/kafka/kafka-jaas.conf
+    environment:
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/kafka-jaas.conf
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      "
+      # Create client properties file for SASL authentication
+      echo 'security.protocol=SASL_PLAINTEXT' > /tmp/client.properties
+      echo 'sasl.mechanism=PLAIN' >> /tmp/client.properties
+      echo 'sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username=\"admin\" password=\"admin-secret\";' >> /tmp/client.properties
+
+      # Wait for Kafka to be ready using kafka-broker-api-versions
+      echo 'Waiting for Kafka to be ready...'
+      for i in $(seq 1 30); do
+        if kafka-broker-api-versions --bootstrap-server kafka:9094 --command-config /tmp/client.properties > /dev/null 2>&1; then
+          echo 'Kafka is ready!'
+          break
+        fi
+        echo \"Waiting for Kafka... (attempt $i/30)\"
+        sleep 1
+      done
+
+      # Create topics
+      echo 'Creating topics...'
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:9094 --topic topic-1 --partitions 3 --replication-factor 1 --command-config /tmp/client.properties
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:9094 --topic topic-2 --partitions 3 --replication-factor 1 --command-config /tmp/client.properties
+
+      # List created topics
+      echo 'Listing topics...'
+      kafka-topics --list --bootstrap-server kafka:9094 --command-config /tmp/client.properties
+      "
+    networks:
+      - kafka-network
+
+networks:
+  kafka-network:
+    driver: bridge
