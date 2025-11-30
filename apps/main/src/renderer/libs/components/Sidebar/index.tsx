@@ -18,35 +18,17 @@ import {
 import { cn } from "@renderer/libs/shadcn/lib/utils";
 import { useTabs } from "@renderer/libs/hooks/useTabs";
 import { ListConnections } from "@renderer/features/connections/components/ListConnections";
+import { AddConnection } from "@renderer/features/connections/components/AddConnection";
 
 export interface SidebarProps {
   className?: string;
-  onConnectionSelect?: (connection: Connection) => void;
-  onAddConnection?: () => void;
-  onDisconnect?: (connection: Connection) => void;
-  onModifyConnection?: (connection: Connection) => void;
 }
 
-export function Sidebar({
-  className,
-  onConnectionSelect,
-  onAddConnection,
-  onDisconnect,
-  onModifyConnection,
-}: SidebarProps) {
+export function Sidebar({ className }: SidebarProps) {
   const { openTab } = useTabs();
 
-  const [expandedConnections, setExpandedConnections] = useState<Set<number>>(
-    new Set(["dummy-kafka-1"])
-  );
-
   const handleAddConnection = () => {
-    if (onAddConnection) {
-      onAddConnection();
-    } else {
-      // Open config tab for new connection
-      openTab("connection_config", {});
-    }
+    openTab("connection_config", {});
   };
 
   return (
@@ -63,14 +45,7 @@ export function Sidebar({
 
       {/* Add Connection Button */}
       <div className="p-4">
-        <Button
-          onClick={handleAddConnection}
-          className="w-full"
-          variant="default"
-        >
-          <Plus className="size-4" />
-          Add Connection
-        </Button>
+        <AddConnection />
       </div>
 
       <Separator />

@@ -12,7 +12,6 @@ export function Home() {
           </p>
         </div>
       </div>
-      <ListConnections />
     </div>
   );
 }
