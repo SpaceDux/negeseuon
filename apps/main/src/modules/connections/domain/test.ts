@@ -1,7 +1,7 @@
 import { ConnectorOrchestrator } from "@/modules/connectors/domain/orchestrator";
 import { Connector } from "@/modules/connectors/domain/connector.abstract";
 import { KafkaConnector } from "@/modules/connectors/domain/kafka";
-import { ConnectorType } from "@/libs/enums/connector_type";
+import { ConnectorType } from "@negeseuon/schemas";
 import {
   ConnectorFactory,
   ConnectorConfigMap,
@@ -11,7 +11,6 @@ export interface TestConnectionInput<T extends ConnectorType = ConnectorType> {
   type: T;
   config: ConnectorConfigMap[keyof ConnectorConfigMap];
 }
-
 export interface TestConnectionResult {
   success: boolean;
   connected: boolean;
@@ -44,8 +43,9 @@ export class TestConnection {
       }
 
       // Create a temporary connector instance using the factory
+      // Use -1 as a temporary ID for testing (not persisted)
       connector = ConnectorFactory.create({
-        key: "test-temp",
+        id: -1,
         name: "Test Connection",
         description: "Temporary connection for testing",
         type: input.type,

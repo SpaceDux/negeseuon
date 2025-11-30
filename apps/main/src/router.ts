@@ -1,14 +1,25 @@
 import { initTRPC } from "@trpc/server";
-import { ConnectorOrchestrator } from "@/modules/connectors/domain/orchestrator";
-import { createConnectionsRouter } from "@/modules/connections/application/router";
+import {
+  createConnectionsRouter,
+  ConnectionsRouter,
+} from "@/modules/connections/application/router";
+import { ConnectionRepository } from "@/modules/connections/repository/connection";
+import { ConfigureConnection } from "@/modules/connections/domain/configure";
+import { getKnex } from "@/libs/knex";
 
 const t = initTRPC.create();
 
-// Create orchestrator instance
-const orchestrator = new ConnectorOrchestrator();
+// Create repository instance
+const connectionRepository = new ConnectionRepository(getKnex());
+
+// Create domain services
+const configureConnection = new ConfigureConnection(connectionRepository);
 
 // Create the connections router
-const connectionsRouter = createConnectionsRouter(orchestrator);
+// Let TypeScript infer the type directly from the function call
+const connectionsRouter: ConnectionsRouter = createConnectionsRouter({
+  configureConnection,
+});
 
 // Export the main router
 export const router = t.router({

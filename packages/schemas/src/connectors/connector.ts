@@ -6,15 +6,24 @@ export const ConnectorTypeSchema = v.union([v.literal("kafka")]);
 export type ConnectorType = v.InferOutput<typeof ConnectorTypeSchema>;
 
 export const ConnectorConfigurationSchema = v.object({
-  key: v.string(),
+  id: v.optional(v.number()),
   name: v.string(),
   description: v.string(),
   type: ConnectorTypeSchema,
   config: v.union([KafkaConfigurationSchema]),
+  connected: v.boolean(),
 });
 
 export type ConnectorConfiguration = v.InferOutput<
   typeof ConnectorConfigurationSchema
+>;
+
+export const ConnectorConfigurationListSchema = v.array(
+  ConnectorConfigurationSchema
+);
+
+export type ConnectorConfigurationList = v.InferOutput<
+  typeof ConnectorConfigurationListSchema
 >;
 
 export const TestConnectionInputSchema = v.object({

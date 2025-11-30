@@ -7,20 +7,21 @@ export default defineConfig(async () => {
   const { default: react } = await import("@vitejs/plugin-react");
   const { default: tailwindcss } = await import("@tailwindcss/vite");
 
-  // Point to the UI package (renamed from renderer)
-  const uiPath = path.resolve(__dirname, "../ui");
+  // Point to the renderer directory within main package
+  const rendererPath = path.resolve(__dirname, "./src/renderer");
 
   return {
-    root: uiPath,
+    root: rendererPath,
     base: "./", // Use relative paths for assets (required for Electron file:// protocol)
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        "@": path.resolve(uiPath, "./src"),
+        "@renderer": path.resolve(rendererPath, "."),
+        "@": path.resolve(__dirname, "./src"),
       },
     },
     build: {
-      outDir: path.resolve(uiPath, "dist"),
+      outDir: path.resolve(__dirname, "./src/renderer/dist"),
       emptyOutDir: true,
     },
   };

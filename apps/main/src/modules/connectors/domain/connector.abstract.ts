@@ -1,5 +1,3 @@
-import { ConnectorType } from "@/libs/enums/connector_type";
-
 /**
  * Abstract class for connectors
  */
@@ -7,7 +5,7 @@ export abstract class Connector<TConfig extends Record<string, unknown>> {
   #isConnected: boolean = false;
 
   constructor(
-    readonly key: string,
+    readonly id: number,
     readonly name: string,
     readonly description: string,
     readonly config: TConfig

@@ -1,0 +1,4 @@
+# This file ensures the migrations directory is tracked by git
+# Add your migration files here with the format: VERSION_NAME.sql
+# Example: 001_initial_schema.sql
+

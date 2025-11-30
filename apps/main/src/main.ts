@@ -4,27 +4,27 @@ import fs from "node:fs";
 import started from "electron-squirrel-startup";
 import { createIPCHandler } from "electron-trpc/main";
 import { router } from "./router";
+import { getDatabase } from "@negeseuon/db";
+import { runMigrations } from "./libs/migrations";
+import { getKnex, closeKnex } from "./libs/knex";
 
 /**
- * Get the path to the UI package's dist directory
- * Uses the workspace structure to find the package location
+ * Get the path to the renderer's dist directory
+ * Renderer is now in the same package as main
  */
 function getUIIndexPath(): string {
-  // In a monorepo, we can rely on the workspace structure
-  // The main process is in apps/main, UI is in apps/ui
+  // Renderer is now in src/renderer/dist within the same package
   // In development: __dirname points to .vite/build/ in apps/main
-  // So we need to go: .vite/build -> apps/main -> apps -> apps/ui/dist
+  // So we need to go: .vite/build -> apps/main/src -> src/renderer/dist
 
   // Try multiple possible locations
   const possiblePaths = [
-    // Development: from .vite/build/ in apps/main, go up 3 levels to workspace root, then apps/ui/dist
-    path.resolve(__dirname, "../../../apps/ui/dist/index.html"),
-    // Alternative: if __dirname is already at apps/main level (not in .vite/build)
-    path.resolve(__dirname, "../ui/dist/index.html"),
-    // Another alternative: relative join (might work in some cases)
-    path.join(__dirname, "../../../apps/ui/dist/index.html"),
-    // Production: might be in node_modules (if packaged)
-    path.resolve(process.cwd(), "node_modules/@negeseuon/ui/dist/index.html"),
+    // Development: from .vite/build/ in apps/main, go to src/renderer/dist
+    path.resolve(__dirname, "../src/renderer/dist/index.html"),
+    // Alternative: if __dirname is already at apps/main level
+    path.resolve(__dirname, "./src/renderer/dist/index.html"),
+    // Production build location
+    path.resolve(process.cwd(), "src/renderer/dist/index.html"),
   ];
 
   // Find the first path that exists
@@ -32,7 +32,7 @@ function getUIIndexPath(): string {
     try {
       const normalizedPath = path.resolve(possiblePath);
       if (fs.existsSync(normalizedPath)) {
-        console.log(`Found UI dist at: ${normalizedPath}`);
+        console.log(`Found renderer dist at: ${normalizedPath}`);
         return normalizedPath;
       }
     } catch (error) {
@@ -40,23 +40,17 @@ function getUIIndexPath(): string {
     }
   }
 
-  // Default fallback (most common case in development)
+  // Default fallback
   const fallbackPath = path.resolve(
     __dirname,
-    "../../../apps/ui/dist/index.html"
+    "../src/renderer/dist/index.html"
   );
   console.error(
-    `UI dist not found in expected locations. __dirname: ${__dirname}, trying fallback: ${fallbackPath}`
+    `Renderer dist not found in expected locations. __dirname: ${__dirname}, trying fallback: ${fallbackPath}`
   );
   console.error(`Fallback exists: ${fs.existsSync(fallbackPath)}`);
   return fallbackPath;
 }
-
-// These constants are provided by Electron Forge at build time
-declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
-declare const MAIN_WINDOW_VITE_NAME: string;
-// @ts-ignore - Electron Forge may provide this in production builds
-declare const MAIN_WINDOW_VITE_LOAD_URL: string | undefined;
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -130,7 +124,23 @@ const createWindow = () => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on("ready", createWindow);
+app.on("ready", async () => {
+  try {
+    // Initialize database and run migrations
+    await runMigrations();
+
+    // Initialize Knex connection
+    getKnex();
+    console.log("Database and Knex initialized successfully");
+
+    // Create window after database is ready
+    createWindow();
+  } catch (error) {
+    console.error("Failed to initialize database:", error);
+    // Still create window, but database operations may fail
+    createWindow();
+  }
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -150,6 +160,14 @@ app.on("activate", () => {
 });
 
 // Clean up on quit
-app.on("before-quit", () => {
-  // Add any cleanup logic here (e.g., close database connections)
+app.on("before-quit", async () => {
+  // Close database connections
+  try {
+    await closeKnex();
+    const dbManager = getDatabase();
+    dbManager.close();
+    console.log("Database connections closed");
+  } catch (error) {
+    console.error("Error closing database connections:", error);
+  }
 });

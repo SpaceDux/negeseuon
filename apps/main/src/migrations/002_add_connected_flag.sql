@@ -1,0 +1,1 @@
+alter table connections add column connected BOOLEAN DEFAULT FALSE;

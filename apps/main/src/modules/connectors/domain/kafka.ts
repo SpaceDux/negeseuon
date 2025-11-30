@@ -1,6 +1,5 @@
-import { ConnectorType } from "@/libs/enums/connector_type";
 import { Connector } from "./connector.abstract";
-import { KafkaConfiguration } from "@/libs/schemas/connectors_config";
+import { KafkaConfiguration, ConnectorType } from "@negeseuon/schemas";
 import { Admin, BaseOptions, Consumer, Producer } from "@platformatic/kafka";
 
 export class KafkaConnector extends Connector<KafkaConfiguration> {
@@ -10,24 +9,22 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
   #admin: Admin | null = null;
   #isConnected: boolean = false;
   #config: KafkaConfiguration;
-  #key: string;
 
   constructor(
-    key: string,
+    id: number,
     name: string,
     description: string,
     config: KafkaConfiguration
   ) {
-    super(key, name, description, config);
+    super(id, name, description, config);
     this.#config = config;
-    this.#key = key;
-    this.#type = ConnectorType.KAFKA;
+    this.#type = "kafka";
   }
 
   private getBaseConfig(config: KafkaConfiguration): BaseOptions {
     return {
       ...config,
-      clientId: `kafka-connector-${this.#key}`,
+      clientId: `kafka-connector-${this.id}`,
       timeout: 30,
       retries: 1,
       strict: true,
@@ -42,7 +39,7 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
     // Initialize consumer client
     this.#consumer = new Consumer({
       ...baseConfig,
-      groupId: `consumer-group-${this.#key}`,
+      groupId: `consumer-group-${this.id}`,
     });
 
     // Initialize producer client

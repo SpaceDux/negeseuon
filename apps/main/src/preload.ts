@@ -8,6 +8,12 @@ import { exposeElectronTRPC } from "electron-trpc/main";
 contextBridge.exposeInMainWorld("electron", {
   // Add any safe APIs you want to expose to the renderer
   platform: process.platform,
+  // Database migration status (if needed by renderer)
+  database: {
+    // Migrations are run automatically in main process
+    // This is just for status if needed
+    ready: true, // Database is initialized in main process before window creation
+  },
 });
 
 process.once("loaded", async () => {

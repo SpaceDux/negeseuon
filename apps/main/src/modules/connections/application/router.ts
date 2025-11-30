@@ -1,19 +1,59 @@
 import { initTRPC } from "@trpc/server";
 import { KafkaConnector } from "@/modules/connectors/domain/kafka";
-import { ConnectorOrchestrator } from "@/modules/connectors/domain/orchestrator";
 import { ConnectorFactory } from "@/modules/connectors/domain/factory";
-import { TestConnectionInputSchema } from "@/libs/schemas/connectors_config";
+import {
+  TestConnectionInputSchema,
+  BooleanResponseSchema,
+  ConnectorConfigurationSchema,
+  ConnectorConfigurationListSchema,
+} from "@negeseuon/schemas";
 import { wrap } from "@typeschema/valibot";
-import { BooleanResponseSchema } from "@/libs/schemas/boolean_response";
+import { ConfigureConnection } from "../domain/configure";
 
 const t = initTRPC.create();
 
+type Dependencies = {
+  configureConnection: ConfigureConnection;
+};
+
 /**
  * Create the connections router
- * @param orchestrator The connector orchestrator instance
+ * @param dependencies The dependencies including domain services
  */
-export function createConnectionsRouter(orchestrator: ConnectorOrchestrator) {
+export function createConnectionsRouter(dependencies: Dependencies) {
   const router = t.router({
+    /**
+     * Upsert a connection (create if new, update if exists)
+     * Saves the connection configuration to the database
+     */
+    upsert: t.procedure
+      .input(wrap(ConnectorConfigurationSchema))
+      .output(wrap(BooleanResponseSchema))
+      .mutation(async ({ input }) => {
+        try {
+          const result =
+            await dependencies.configureConnection.upsertConnection(input);
+
+          const action = result.isNew ? "created" : "updated";
+          return {
+            success: true,
+            message: `Connection "${result.connection.name}" ${action} successfully with ID ${result.connection.id}`,
+          };
+        } catch (error) {
+          return {
+            success: false,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Failed to upsert connection",
+          };
+        }
+      }),
+    list: t.procedure
+      .output(wrap(ConnectorConfigurationListSchema))
+      .query(async () => {
+        return await dependencies.configureConnection.listConnections();
+      }),
     /**
      * Test a connection configuration
      * Validates the connection can be established without actually connecting
@@ -29,12 +69,13 @@ export function createConnectionsRouter(orchestrator: ConnectorOrchestrator) {
           }
 
           // Create a temporary connector instance using the factory
+          // Use -1 as a temporary ID for testing (not persisted)
           const tempConnector = ConnectorFactory.create({
-            key: "test-temp",
+            id: -1,
             name: "Test Connection",
             description: "Temporary connection for testing",
             type: input.type,
-            config: input.config,
+            config: input.config.config,
           });
 
           // Test the connection (for Kafka, use the testConnection method)
@@ -43,7 +84,9 @@ export function createConnectionsRouter(orchestrator: ConnectorOrchestrator) {
 
           if (tempConnector instanceof KafkaConnector) {
             // Kafka's testConnection creates its own client, so we don't need to connect/disconnect
-            isConnected = await tempConnector.testConnection(input.config);
+            isConnected = await tempConnector.testConnection(
+              input.config.config
+            );
           } else {
             // For other connector types, connect and test
             await tempConnector.connect();
@@ -79,4 +122,5 @@ export function createConnectionsRouter(orchestrator: ConnectorOrchestrator) {
   return router;
 }
 
+// Properly infer the router type from the function return
 export type ConnectionsRouter = ReturnType<typeof createConnectionsRouter>;

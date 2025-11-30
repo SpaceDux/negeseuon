@@ -1,14 +1,13 @@
-import { ConnectorType } from "@/libs/enums/connector_type";
 import { Connector } from "./connector.abstract";
 import { KafkaConnector } from "./kafka";
-import { KafkaConfiguration } from "@/libs/schemas/connectors_config";
+import { ConnectorType, KafkaConfiguration } from "@negeseuon/schemas";
 
 export type ConnectorConfigMap = {
   kafka: KafkaConfiguration;
 };
 
 export interface ConnectorFactoryOptions<T extends ConnectorType> {
-  key: string;
+  id: number;
   name: string;
   description: string;
   type: T;
@@ -19,17 +18,19 @@ export interface ConnectorFactoryOptions<T extends ConnectorType> {
  * Factory for creating connector instances
  */
 export class ConnectorFactory {
-  private static readonly connectorCreators: Record<
-    ConnectorType,
-    (options: {
-      key: string;
-      name: string;
-      description: string;
-      config: any;
-    }) => Connector<any>
+  private static readonly connectorCreators: Partial<
+    Record<
+      keyof ConnectorConfigMap,
+      (options: {
+        id: number;
+        name: string;
+        description: string;
+        config: ConnectorConfigMap[keyof ConnectorConfigMap];
+      }) => Connector<ConnectorConfigMap[keyof ConnectorConfigMap]>
+    >
   > = {
-    [ConnectorType.KAFKA]: ({ key, name, description, config }) =>
-      new KafkaConnector(key, name, description, config as KafkaConfiguration),
+    kafka: ({ id, name, description, config }) =>
+      new KafkaConnector(id, name, description, config as KafkaConfiguration),
   };
 
   /**
@@ -37,21 +38,19 @@ export class ConnectorFactory {
    * @param options The connector creation options
    * @returns A new connector instance
    */
-  public static create<T extends ConnectorType>(
-    options: ConnectorFactoryOptions<T>
-  ): Connector<ConnectorConfigMap[keyof ConnectorConfigMap]> {
+  public static create<
+    T extends keyof ConnectorConfigMap = keyof ConnectorConfigMap,
+  >(options: ConnectorFactoryOptions<T>): Connector<ConnectorConfigMap[T]> {
     const creator = this.connectorCreators[options.type];
-
     if (!creator) {
       throw new Error(`Unsupported connector type: ${options.type}`);
     }
-
     return creator({
-      key: options.key,
+      id: options.id,
       name: options.name,
       description: options.description,
       config: options.config,
-    }) as Connector<ConnectorConfigMap[keyof ConnectorConfigMap]>;
+    }) as Connector<ConnectorConfigMap[T]>;
   }
 
   /**
@@ -62,7 +61,7 @@ export class ConnectorFactory {
   public static register<T extends ConnectorType>(
     type: T,
     creator: (options: {
-      key: string;
+      id: number;
       name: string;
       description: string;
       config: ConnectorConfigMap[keyof ConnectorConfigMap];

@@ -10,12 +10,14 @@ const SaslMechanismSchema = v.union([
 export const KafkaConfigurationSchema = v.object({
   bootstrapBrokers: v.pipe(v.array(v.string()), v.minLength(1)),
   timeout: v.optional(v.number()),
-  sasl: v.object({
-    mechanism: SaslMechanismSchema,
-    username: v.optional(v.string()),
-    password: v.optional(v.string()),
-    token: v.optional(v.string()),
-  }),
+  sasl: v.optional(
+    v.object({
+      mechanism: SaslMechanismSchema,
+      username: v.optional(v.string()),
+      password: v.optional(v.string()),
+      token: v.optional(v.string()),
+    })
+  ),
 });
 
 export type KafkaConfiguration = v.InferOutput<typeof KafkaConfigurationSchema>;
