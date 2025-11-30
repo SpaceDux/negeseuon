@@ -23,8 +23,11 @@
     "@negeseuon/ui": "workspace:*",
     "@platformatic/kafka": "^1.21.0",
     "@trpc/server": "^10.45.2",
+    "@typeschema/valibot": "^0.14.0",
+    "better-sqlite3": "^11.9.0",
     "electron-squirrel-startup": "^1.0.1",
     "electron-trpc": "^0.7.1",
+    "knex": "^3.1.0",
     "reflect-metadata": "^0.2.2",
     "tsyringe": "^4.10.0",
     "valibot": "^1.2.0"

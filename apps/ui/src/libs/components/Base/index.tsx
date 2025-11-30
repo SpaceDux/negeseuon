@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import { cn } from "@/libs/shadcn/lib/utils";
 import { Sidebar, type SidebarProps } from "@/libs/components/Sidebar";
+import { TabBar } from "@/libs/components/TabBar";
 
 interface BaseProps {
   sidebarProps?: SidebarProps;
@@ -79,7 +80,10 @@ export function Base({
           }}
         />
       </div>
-      <main className="flex-1 overflow-auto min-w-0">{children}</main>
+      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
+        <TabBar />
+        <main className="flex-1 overflow-auto min-w-0">{children}</main>
+      </div>
     </div>
   );
 }

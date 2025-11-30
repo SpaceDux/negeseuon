@@ -16,6 +16,7 @@ import {
   Settings,
 } from "lucide-react";
 import { cn } from "@/libs/shadcn/lib/utils";
+import { useTabs } from "@/libs/hooks/useTabs";
 
 export interface Topic {
   id: string;
@@ -47,6 +48,7 @@ export function Sidebar({
   onDisconnect,
   onModifyConnection,
 }: SidebarProps) {
+  const { openTab } = useTabs();
   const [connections, setConnections] = useState<Connection[]>([
     {
       id: "dummy-kafka-1",
@@ -70,15 +72,8 @@ export function Sidebar({
     if (onAddConnection) {
       onAddConnection();
     } else {
-      // Default behavior: add a sample connection for demo
-      const newConnection: Connection = {
-        id: `conn-${Date.now()}`,
-        name: `Connection ${connections.length + 1}`,
-        type: "kafka",
-        host: "localhost",
-        port: 9092,
-      };
-      setConnections([...connections, newConnection]);
+      // Open config tab for new connection
+      openTab("connection_config", {});
     }
   };
 
@@ -104,14 +99,13 @@ export function Sidebar({
     if (onModifyConnection) {
       onModifyConnection(connection);
     } else {
-      // Default behavior: log for now
-      console.log("Modify connection:", connection);
-    }
-  };
-
-  const handleConnectionClick = (connection: Connection) => {
-    if (onConnectionSelect) {
-      onConnectionSelect(connection);
+      // Open config tab for editing connection
+      openTab("connection_config", {
+        id: connection.id,
+        connectionId: connection.id,
+        connectionName: connection.name,
+        connection,
+      });
     }
   };
 
@@ -264,8 +258,7 @@ export function Sidebar({
                               className="relative flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent/70 cursor-pointer text-sm transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // TODO: Handle topic selection
-                                console.log("Topic selected:", topic);
+                                openTab("kafka", { connection, topic });
                               }}
                             >
                               {/* Horizontal connector line */}

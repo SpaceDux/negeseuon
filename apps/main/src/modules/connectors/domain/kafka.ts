@@ -1,6 +1,6 @@
 import { ConnectorType } from "@/libs/enums/connector_type";
 import { Connector } from "./connector.abstract";
-import { KafkaConfiguration } from "@/libs/schemas/configuration";
+import { KafkaConfiguration } from "@/libs/schemas/connectors_config";
 import { Admin, BaseOptions, Consumer, Producer } from "@platformatic/kafka";
 
 export class KafkaConnector extends Connector<KafkaConfiguration> {
