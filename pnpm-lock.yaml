@@ -283,6 +283,19 @@ importers:
         specifier: ^5.9.2
         version: 5.9.2
 
+  packages/schemas:
+    dependencies:
+      '@negeseuon/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      valibot:
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@5.9.2)
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+
   packages/typescript-config: {}
 
   packages/utils:
