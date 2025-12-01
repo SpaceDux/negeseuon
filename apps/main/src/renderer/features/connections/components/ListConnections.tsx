@@ -55,12 +55,16 @@ export function ListConnections() {
     expandedConnections.delete(connectionId);
   };
 
-  const getConnectionIcon = (type: "kafka") => {
+  const getConnectionIcon = (type: "kafka", isConnected: boolean) => {
     switch (type) {
       case "kafka":
-        return <Layers className="size-4 text-green-600" />;
+        return isConnected ? (
+          <Layers className="size-4 text-green-600" />
+        ) : (
+          <Layers className="size-4 text-muted-foreground" />
+        );
       default:
-        return <Layers className="size-4 text-muted-foreground" />;
+        return <Layers className="size-4 text-red-600" />;
     }
   };
 
@@ -104,7 +108,7 @@ export function ListConnections() {
   };
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 pr-2 pl-2 pt-2">
       {data.map((connection) => {
         const isConnected = connection.connected;
         const isExpanded = expandedConnections.has(connection.id!);
@@ -120,7 +124,7 @@ export function ListConnections() {
               className={cn(
                 "group rounded-md border transition-all duration-200 relative",
                 isExpanded
-                  ? "border-sidebar-border bg-sidebar-accent shadow-sm" 
+                  ? "border-sidebar-border bg-sidebar-accent shadow-sm"
                   : "border-transparent hover:border-border hover:bg-accent/50"
               )}
             >
@@ -135,7 +139,7 @@ export function ListConnections() {
                   )}
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {getConnectionIcon(connection.type)}
+                    {getConnectionIcon(connection.type, isConnected)}
                     <div className="flex flex-col min-w-0 flex-1">
                       <span className="text-sm font-medium truncate">
                         {connection.name}

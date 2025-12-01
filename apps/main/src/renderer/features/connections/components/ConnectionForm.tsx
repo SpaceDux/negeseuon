@@ -137,6 +137,7 @@ export function ConnectionForm({
           description: values.description,
           type: "kafka",
           config: kafkaConfig,
+          connected: false,
         },
       });
 
@@ -172,6 +173,7 @@ export function ConnectionForm({
         description: values.description,
         type: "kafka",
         config: kafkaConfig,
+        connected: false,
       };
 
       const result = await client.connections.upsert.mutate(connectionData);

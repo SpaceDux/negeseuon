@@ -16,7 +16,8 @@
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts .",
     "build": "vite build",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {
     "@negeseuon/db": "workspace:*",
