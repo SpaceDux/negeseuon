@@ -55,7 +55,6 @@ export class ConfigureConnection {
    */
   public async listConnections(): Promise<ConnectorConfigurationList> {
     const connections = await this.repository.getAllConnections();
-    console.log(connections);
     return connections.map(
       (connection): ConnectorConfiguration => ({
         id: connection.id,
