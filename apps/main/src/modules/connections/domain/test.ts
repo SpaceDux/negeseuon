@@ -1,6 +1,5 @@
 import { ConnectorOrchestrator } from "@/modules/connectors/domain/orchestrator";
 import { Connector } from "@/modules/connectors/domain/connector.abstract";
-import { KafkaConnector } from "@/modules/connectors/domain/kafka";
 import { ConnectorType } from "@negeseuon/schemas";
 import {
   ConnectorFactory,
@@ -52,24 +51,28 @@ export class TestConnection {
         config: input.config,
       });
 
-      // Connect to the service
-      await connector.connect();
-
       // Test the connection
-      // For Kafka, use the testConnection method if available
+      // Some connectors support testConnection without fully connecting
       let isConnected = false;
-      if (connector instanceof KafkaConnector) {
+      const brokerOps = connector as Connector<any> & {
+        testConnection?: (config: unknown) => Promise<boolean>;
+      };
+
+      if (typeof brokerOps.testConnection === "function") {
+        // Use the connector's testConnection method if available
         try {
-          isConnected = await connector.testConnection(input.config);
+          isConnected = await brokerOps.testConnection(input.config);
         } catch (testError) {
-          // If testConnection fails, check if basic connection is established
+          // If testConnection fails, fall back to connect and check
+          await connector.connect();
           isConnected = connector.isConnected();
           if (!isConnected) {
             throw testError;
           }
         }
       } else {
-        // For other connector types, just check if connected
+        // For connectors without testConnection, connect and check
+        await connector.connect();
         isConnected = connector.isConnected();
       }
 

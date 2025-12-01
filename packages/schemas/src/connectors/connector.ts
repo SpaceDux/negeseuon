@@ -1,16 +1,22 @@
 import * as v from "valibot";
 import { KafkaConfigurationSchema } from "./kafka";
 
-export const ConnectorTypeSchema = v.union([v.literal("kafka")]);
+// Extend this union to add new connector types
+export const ConnectorTypeSchema = v.union([
+  v.literal("kafka"),
+  v.literal("rabbitmq"),
+  // Add more connector types here as needed
+]);
 
 export type ConnectorType = v.InferOutput<typeof ConnectorTypeSchema>;
 
+// Base configuration schema - extend this union to add new connector configs
 export const ConnectorConfigurationSchema = v.object({
   id: v.optional(v.number()),
   name: v.string(),
   description: v.string(),
   type: ConnectorTypeSchema,
-  config: v.union([KafkaConfigurationSchema]),
+  config: v.union([KafkaConfigurationSchema]), // Add more config schemas here
   connected: v.boolean(),
 });
 

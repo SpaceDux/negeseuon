@@ -21,3 +21,4 @@ export const KafkaConfigurationSchema = v.object({
 });
 
 export type KafkaConfiguration = v.InferOutput<typeof KafkaConfigurationSchema>;
+

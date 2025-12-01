@@ -1,6 +1,6 @@
 import { initTRPC } from "@trpc/server";
-import { KafkaConnector } from "@/modules/connectors/domain/kafka";
 import { ConnectorFactory } from "@/modules/connectors/domain/factory";
+import { Connector } from "@/modules/connectors/domain/connector.abstract";
 import {
   TestConnectionInputSchema,
   BooleanResponseSchema,
@@ -78,17 +78,20 @@ export function createConnectionsRouter(dependencies: Dependencies) {
             config: input.config.config,
           });
 
-          // Test the connection (for Kafka, use the testConnection method)
+          // Test the connection
+          // Some connectors support testConnection without fully connecting
           let isConnected = false;
           let needsDisconnect = false;
+          const brokerOps = tempConnector as Connector<any> & {
+            testConnection?: (config: unknown) => Promise<boolean>;
+          };
 
-          if (tempConnector instanceof KafkaConnector) {
-            // Kafka's testConnection creates its own client, so we don't need to connect/disconnect
-            isConnected = await tempConnector.testConnection(
-              input.config.config
-            );
+          if (typeof brokerOps.testConnection === "function") {
+            // Use the connector's testConnection method if available
+            // This may create its own client, so we don't need to connect/disconnect
+            isConnected = await brokerOps.testConnection(input.config.config);
           } else {
-            // For other connector types, connect and test
+            // For connectors without testConnection, connect and test
             await tempConnector.connect();
             isConnected = tempConnector.isConnected();
             needsDisconnect = true;

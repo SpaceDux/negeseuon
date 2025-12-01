@@ -47,6 +47,10 @@ export class ConnectionRepository {
     return created;
   }
 
+  public async setConnected(id: number, connected: boolean): Promise<void> {
+    await this.knex("connections").where({ id }).update({ connected });
+  }
+
   /**
    * Update an existing connection in the database
    * @param id The connection ID

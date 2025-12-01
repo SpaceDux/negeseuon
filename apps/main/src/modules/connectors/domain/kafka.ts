@@ -135,4 +135,21 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
   public getAdmin(): Admin | null {
     return this.#admin;
   }
+
+  /**
+   * Get the connector type
+   */
+  public getType(): string {
+    return this.#type;
+  }
+
+  /**
+   * List available topics (Kafka-specific operation)
+   */
+  public async listTopics(): Promise<string[]> {
+    if (!this.#admin) {
+      throw new Error("Connector is not connected");
+    }
+    return await this.#admin.listTopics();
+  }
 }
