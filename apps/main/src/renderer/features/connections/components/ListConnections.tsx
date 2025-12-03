@@ -12,12 +12,15 @@ import { Skeleton } from "@renderer/libs/shadcn/components/ui/skeleton";
 import { useTabs } from "@renderer/libs/hooks/useTabs";
 import { ConnectorConfiguration } from "@negeseuon/schemas";
 import { ConnectButton } from "@renderer/features/connector/components/ConnectButton";
-import { useMemo, createRef } from "react";
+import { useMemo, createRef, useState } from "react";
 import { ListTopics } from "@renderer/features/connector/components/ListTopics";
 
 export function ListConnections() {
   const { listConnections } = useConnections();
   const { openTab } = useTabs();
+  const [expandedConnections, setExpandedConnections] = useState<Set<number>>(
+    new Set()
+  );
 
   const { isLoading, data, isError, error } = useQuery({
     queryKey: ["list-connections"],
@@ -56,17 +59,23 @@ export function ListConnections() {
     return <div>No data</div>;
   }
 
-  const expandedConnections = new Set<number>();
-
   const toggleConnection = (connection: ConnectorConfiguration) => {
-    if (!connection.id || !connection.connected) {
+    if (!connection.id) {
       return;
     }
-    if (expandedConnections.has(connection.id)) {
-      expandedConnections.delete(connection.id);
-    } else {
-      expandedConnections.add(connection.id);
+    if (!connection.connected) {
+      return;
     }
+
+    setExpandedConnections((prev) => {
+      const next = new Set(prev);
+      if (next.has(connection.id!)) {
+        next.delete(connection.id!);
+      } else {
+        next.add(connection.id!);
+      }
+      return next;
+    });
   };
 
   const handleDoubleClick = (connection: ConnectorConfiguration) => {
@@ -140,7 +149,11 @@ export function ListConnections() {
           <Collapsible
             key={connection.id}
             open={isExpanded}
-            onOpenChange={() => toggleConnection(connection)}
+            onOpenChange={(open) => {
+              if (open !== isExpanded) {
+                toggleConnection(connection);
+              }
+            }}
           >
             <div
               className={cn(

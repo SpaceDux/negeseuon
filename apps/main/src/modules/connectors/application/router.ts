@@ -54,7 +54,10 @@ export function createConnectorsRouter(dependencies: Dependencies) {
         .query(async ({ input }) => {
           const { connectionId } = input;
 
-          return await dependencies.connectorService.listTopics(connectionId);
+          const topics =
+            await dependencies.connectorService.listTopics(connectionId);
+
+          return topics;
         }),
     }),
     publish: t.procedure
