@@ -6,28 +6,36 @@ import {
 import { useConnections } from "../hooks/useConnections";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@renderer/libs/shadcn/components/ui/button";
-import {
-  ChevronDown,
-  ChevronRight,
-  Layers,
-  Power,
-  Settings,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Layers, Settings } from "lucide-react";
 import { cn } from "@renderer/libs/shadcn/lib/utils";
 import { Skeleton } from "@renderer/libs/shadcn/components/ui/skeleton";
 import { useTabs } from "@renderer/libs/hooks/useTabs";
 import { ConnectorConfiguration } from "@negeseuon/schemas";
-import { useState } from "react";
+import { ConnectButton } from "@renderer/features/connector/components/ConnectButton";
+import { useMemo, createRef } from "react";
+import { ListTopics } from "@renderer/features/connector/components/ListTopics";
 
 export function ListConnections() {
   const { listConnections } = useConnections();
   const { openTab } = useTabs();
+
   const { isLoading, data, isError, error } = useQuery({
     queryKey: ["list-connections"],
     queryFn: listConnections,
     enabled: true,
   });
-  const [topics, _] = useState<any[]>([]); // TODO: Fix this
+
+  const buttonRefs = useMemo(() => {
+    if (!data)
+      return new Map<number, React.RefObject<HTMLButtonElement | null>>();
+    const refs = new Map<number, React.RefObject<HTMLButtonElement | null>>();
+    data.forEach((connection) => {
+      if (connection.id) {
+        refs.set(connection.id, createRef<HTMLButtonElement>());
+      }
+    });
+    return refs;
+  }, [data]);
 
   if (isLoading) {
     // Skeleton loading
@@ -50,9 +58,24 @@ export function ListConnections() {
 
   const expandedConnections = new Set<number>();
 
-  const toggleConnection = (connectionId: number) => {
-    expandedConnections.add(connectionId);
-    expandedConnections.delete(connectionId);
+  const toggleConnection = (connection: ConnectorConfiguration) => {
+    if (!connection.id || !connection.connected) {
+      return;
+    }
+    if (expandedConnections.has(connection.id)) {
+      expandedConnections.delete(connection.id);
+    } else {
+      expandedConnections.add(connection.id);
+    }
+  };
+
+  const handleDoubleClick = (connection: ConnectorConfiguration) => {
+    if (!connection.id || connection.connected) {
+      return;
+    }
+
+    const ref = buttonRefs.get(connection.id);
+    ref?.current?.click();
   };
 
   const getConnectionIcon = (type: "kafka", isConnected: boolean) => {
@@ -112,13 +135,12 @@ export function ListConnections() {
       {data.map((connection) => {
         const isConnected = connection.connected;
         const isExpanded = expandedConnections.has(connection.id!);
-        const hasTopics = false;
 
         return (
           <Collapsible
             key={connection.id}
             open={isExpanded}
-            onOpenChange={() => toggleConnection(connection.id!)}
+            onOpenChange={() => toggleConnection(connection)}
           >
             <div
               className={cn(
@@ -137,6 +159,10 @@ export function ListConnections() {
                     "flex w-full items-center gap-2 px-3 py-2",
                     isExpanded && "bg-sidebar-accent/50"
                   )}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    handleDoubleClick(connection);
+                  }}
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     {getConnectionIcon(connection.type, isConnected)}
@@ -150,29 +176,20 @@ export function ListConnections() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    {hasTopics &&
-                      (isExpanded ? (
-                        <ChevronDown className="size-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="size-4 text-muted-foreground" />
-                      ))}
+                    {isExpanded ? (
+                      <ChevronDown className="size-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="size-4 text-muted-foreground" />
+                    )}
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isConnected) {
-                            // TODO: Implement disconnect
-                          } else {
-                            // TODO: Implement connect
-                          }
-                        }}
-                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                        title={isConnected ? "Disconnect" : "Connect"}
-                      >
-                        <Power className="size-3" />
-                      </Button>
+                      <ConnectButton
+                        connection={connection}
+                        buttonRef={
+                          connection.id
+                            ? buttonRefs.get(connection.id)
+                            : undefined
+                        }
+                      />
                       <Button
                         variant="ghost"
                         size="icon-sm"
@@ -191,15 +208,7 @@ export function ListConnections() {
                   </div>
                 </div>
               </CollapsibleTrigger>
-              {isExpanded &&
-                topics.length > 0 &&
-                topics.map((topic) => (
-                  <TopicItem
-                    key={topic.id}
-                    connection={connection}
-                    topic={topic}
-                  />
-                ))}
+              {isExpanded && <ListTopics connection={connection} />}
             </div>
           </Collapsible>
         );

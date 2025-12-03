@@ -2,6 +2,7 @@ import { ConnectionRepository } from "@/modules/connections/repository/connectio
 import { ConnectorOrchestrator } from "./orchestrator";
 import { BooleanResponse } from "@negeseuon/schemas";
 import { supports } from "./connector.abstract";
+import { safeAsync } from "@negeseuon/utils";
 
 type Dependencies = {
   repository: ConnectionRepository;
@@ -12,31 +13,84 @@ export class ConnectorService {
   constructor(private readonly dependencies: Dependencies) {}
 
   public async connect(connectionId: number): Promise<BooleanResponse> {
-    const connector = this.dependencies.orchestrator.getConnector(connectionId);
+    let connector = this.dependencies.orchestrator.getConnector(connectionId);
+
+    // If connector doesn't exist in orchestrator, try to load it from database
     if (!connector) {
-      throw new Error(`Connector with ID ${connectionId} not found`);
+      const connectionRow =
+        await this.dependencies.repository.getConnectionById(connectionId);
+      if (!connectionRow) {
+        return {
+          success: false,
+          message: `Connection with ID ${connectionId} not found`,
+        };
+      }
+      connector =
+        this.dependencies.orchestrator.loadConnectionFromDatabase(
+          connectionRow
+        );
     }
 
-    await connector.connect();
+    const [_, error] = await safeAsync(() => connector.connect());
+    if (error) {
+      console.error(error);
+      await this.dependencies.repository.setConnected(connectionId, false);
+      return {
+        success: false,
+        message: `Failed to connect to connection ${connector.name}: ${error.message}`,
+      };
+    }
+
     await this.dependencies.repository.setConnected(connectionId, true);
     return {
       success: true,
-      message: `Connected to connection ${connectionId} successfully`,
+      message: `Connected to connection ${connector.name} successfully`,
     };
   }
 
   public async disconnect(connectionId: number): Promise<BooleanResponse> {
-    const connector = this.dependencies.orchestrator.getConnector(connectionId);
+    let connector = this.dependencies.orchestrator.getConnector(connectionId);
+
+    // If connector doesn't exist in orchestrator, try to load it from database
     if (!connector) {
-      throw new Error(`Connector with ID ${connectionId} not found`);
+      const connectionRow =
+        await this.dependencies.repository.getConnectionById(connectionId);
+      if (!connectionRow) {
+        await this.dependencies.repository.setConnected(connectionId, false);
+        return {
+          success: true,
+          message: `Connection with ID ${connectionId} not found`,
+        };
+      }
+      connector =
+        this.dependencies.orchestrator.loadConnectionFromDatabase(
+          connectionRow
+        );
     }
 
-    await connector.disconnect();
-    await this.dependencies.repository.setConnected(connectionId, false);
+    // Only disconnect if the connector is actually connected
+    if (connector.isConnected()) {
+      const [_, error] = await safeAsync(() => connector!.disconnect());
+      if (error) {
+        console.error(error);
+        await this.dependencies.repository.setConnected(connectionId, false);
+        return {
+          success: false,
+          message: `Failed to disconnect from connection ${connectionId}: ${error.message}`,
+        };
+      }
 
+      await this.dependencies.repository.setConnected(connectionId, false);
+      return {
+        success: true,
+        message: `Disconnected from connection ${connector.name} successfully`,
+      };
+    }
+
+    await this.dependencies.repository.setConnected(connectionId, false);
     return {
       success: true,
-      message: `Disconnected from connection ${connectionId} successfully`,
+      message: `Disconnected from connection ${connector.name} successfully`,
     };
   }
 
@@ -51,7 +105,8 @@ export class ConnectorService {
     }
 
     if (!connector.isConnected()) {
-      throw new Error(`Connector with ID ${connectionId} is not connected`);
+      await this.connect(connectionId);
+      return this.listTopics(connectionId);
     }
 
     if (!supports(connector, "listTopics")) {
@@ -60,7 +115,7 @@ export class ConnectorService {
       );
     }
 
-    return await connector.listTopics();
+    return connector.listTopics();
   }
 
   /**

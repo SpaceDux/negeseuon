@@ -6,5 +6,6 @@ export function useConnections() {
   const listConnections = async () => {
     return await client.connections.list.query();
   };
+
   return { listConnections };
 }

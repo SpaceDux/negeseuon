@@ -1,5 +1,6 @@
 import { Connector } from "./connector.abstract";
 import { KafkaConfiguration, ConnectorType } from "@negeseuon/schemas";
+import { safeAsync } from "@negeseuon/utils";
 import { Admin, BaseOptions, Consumer, Producer } from "@platformatic/kafka";
 
 export class KafkaConnector extends Connector<KafkaConfiguration> {
@@ -48,7 +49,14 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
     // Initialize admin client (for managing topics, partitions, etc.)
     this.#admin = new Admin(baseConfig);
 
+    const [topics, error] = await safeAsync(() => this.#admin!.listTopics());
+    if (error) {
+      console.error(error);
+      throw error;
+    }
+
     this.#isConnected = true;
+    return;
   }
 
   /**
@@ -150,6 +158,13 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
     if (!this.#admin) {
       throw new Error("Connector is not connected");
     }
-    return await this.#admin.listTopics();
+
+    const [topics, error] = await safeAsync(() => this.#admin!.listTopics());
+    if (error) {
+      console.error(error);
+      throw error;
+    }
+
+    return topics ?? [];
   }
 }

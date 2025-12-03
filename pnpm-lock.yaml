@@ -33,6 +33,9 @@ importers:
       '@negeseuon/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas
+      '@negeseuon/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       '@platformatic/kafka':
         specifier: ^1.21.0
         version: 1.21.0
