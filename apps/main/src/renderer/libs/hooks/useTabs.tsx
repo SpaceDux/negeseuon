@@ -1,130 +1,96 @@
-import { ConnectorConfiguration } from "@negeseuon/schemas";
 import {
   createContext,
   useContext,
   useState,
   useCallback,
   type ReactNode,
+  type ComponentType,
 } from "react";
 
-export interface KafkaTabContext {
+export interface TabMetadata {
+  title: string;
+  subtitle?: string;
+}
+
+export interface Tab<T = unknown> {
   id: string;
-  connection: ConnectorConfiguration;
-  topic: any; // TODO: Fix this
+  type: string;
+  context: T;
+  metadata: TabMetadata;
 }
 
-export interface ConnectionConfigTabContext {
-  id?: string; // undefined for new connections
-  connectionName?: string;
-  connection?: ConnectorConfiguration; // full connection object if editing
+export interface TabTypeDefinition<T = unknown> {
+  generateId: (context: T) => string;
+  getMetadata: (context: T) => TabMetadata;
+  component: ComponentType<{ context: T }>;
 }
 
-export type TabType = "kafka" | "connection_config";
-
-export type Tab =
-  | {
-      type: "kafka";
-      id: string;
-      context: KafkaTabContext;
-    }
-  | {
-      type: "connection_config";
-      id: string;
-      context: ConnectionConfigTabContext;
-    };
+type TabRegistry = Map<string, TabTypeDefinition<unknown>>;
 
 interface TabContextValue {
   tabs: Tab[];
   activeTabId: string | null;
-  openTab: {
-    (
-      type: "kafka",
-      context: { connection: ConnectorConfiguration; topic: any }
-    ): void;
-    (type: "connection_config", context: ConnectionConfigTabContext): void;
-  };
+  openTab: <T>(type: string, context: T) => void;
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
   closeAllTabs: () => void;
   closeOtherTabs: (tabId: string) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
+  registerTabType: <T>(type: string, definition: TabTypeDefinition<T>) => void;
+  getTabRenderer: (tab: Tab) => ComponentType<{ context: unknown }> | null;
 }
 
 const TabContext = createContext<TabContextValue | undefined>(undefined);
+
+// Global registry for tab types
+const tabRegistry: TabRegistry = new Map();
 
 export function TabProvider({ children }: { children: ReactNode }) {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
-  const openTab = useCallback(
-    (
-      type: TabType,
-      context:
-        | { connection: ConnectorConfiguration; topic: any }
-        | ConnectionConfigTabContext
-    ) => {
-      if (type === "kafka") {
-        const kafkaContext = context as {
-          connection: ConnectorConfiguration;
-          topic: any;
-        };
-        const { connection, topic } = kafkaContext;
-        const tabId = `kafka-${connection.id}-${topic.id}`;
+  const registerTabType = useCallback(<T,>(
+    type: string,
+    definition: TabTypeDefinition<T>
+  ) => {
+    tabRegistry.set(type, definition as TabTypeDefinition<unknown>);
+  }, []);
 
-        setTabs((prevTabs) => {
-          // Check if tab already exists
-          const existingTab = prevTabs.find((tab) => tab.id === tabId);
-          if (existingTab) {
-            setActiveTabId(tabId);
-            return prevTabs;
-          }
+  const openTab = useCallback(<T,>(type: string, context: T) => {
+    const definition = tabRegistry.get(type);
+    if (!definition) {
+      console.warn(`Tab type "${type}" is not registered`);
+      return;
+    }
 
-          // Create new tab
-          const newTab: Tab = {
-            type: "kafka",
-            id: tabId,
-            context: {
-              id: tabId,
-              connection,
-              topic,
-            },
-          };
+    const tabId = definition.generateId(context);
+    const metadata = definition.getMetadata(context);
 
-          setActiveTabId(tabId);
-          return [...prevTabs, newTab];
-        });
-      } else if (type === "connection_config") {
-        const configContext = context as ConnectionConfigTabContext;
-        // Generate tab ID - use connection ID if editing, or generate new one for new connections
-        const tabId =
-          configContext.connection && configContext.connection.id
-            ? `config-${configContext.connection.id}`
-            : `config-new-${Date.now()}`;
-
-        setTabs((prevTabs) => {
-          // Check if tab already exists (for editing existing connections)
-          if (configContext.connection && configContext.connection.id) {
-            const existingTab = prevTabs.find((tab) => tab.id === tabId);
-            if (existingTab) {
-              setActiveTabId(tabId);
-              return prevTabs;
-            }
-          }
-
-          // Create new tab
-          const newTab: Tab = {
-            type: "connection_config",
-            id: tabId,
-            context: configContext,
-          };
-
-          setActiveTabId(tabId);
-          return [...prevTabs, newTab];
-        });
+    setTabs((prevTabs) => {
+      // Check if tab already exists
+      const existingTab = prevTabs.find((tab) => tab.id === tabId);
+      if (existingTab) {
+        setActiveTabId(tabId);
+        return prevTabs;
       }
-    },
-    []
-  ) as TabContextValue["openTab"];
+
+      // Create new tab
+      const newTab: Tab<T> = {
+        id: tabId,
+        type,
+        context,
+        metadata,
+      };
+
+      setActiveTabId(tabId);
+      return [...prevTabs, newTab];
+    });
+  }, []);
+
+  const getTabRenderer = useCallback((tab: Tab) => {
+    const definition = tabRegistry.get(tab.type);
+    return definition?.component || null;
+  }, []);
 
   const closeTab = useCallback(
     (tabId: string) => {
@@ -183,6 +149,8 @@ export function TabProvider({ children }: { children: ReactNode }) {
         closeAllTabs,
         closeOtherTabs,
         reorderTabs,
+        registerTabType,
+        getTabRenderer,
       }}
     >
       {children}

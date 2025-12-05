@@ -2,22 +2,17 @@ import { useTabs } from "@renderer/libs/hooks/useTabs";
 import { ConnectionForm } from "@renderer/features/connections/components/ConnectionForm";
 import type { ConnectorConfiguration } from "@negeseuon/schemas";
 
-export function ConnectionConfigView() {
-  const { tabs, activeTabId, closeTab } = useTabs();
-  const activeTab = tabs.find((tab) => tab.id === activeTabId);
+interface ConnectionConfigViewContext {
+  connection?: ConnectorConfiguration;
+}
 
-  if (!activeTab || activeTab.type !== "connection_config") {
-    return (
-      <div className="flex h-full items-center justify-center p-8">
-        <div className="text-center text-muted-foreground">
-          <p className="text-lg font-medium">No configuration selected</p>
-        </div>
-      </div>
-    );
-  }
+interface ConnectionConfigViewProps {
+  context: ConnectionConfigViewContext;
+}
 
-  const { context } = activeTab;
-  const initialData = context.connection as ConnectorConfiguration | undefined;
+export function ConnectionConfigView({ context }: ConnectionConfigViewProps) {
+  const { closeTab, activeTabId } = useTabs();
+  const initialData = context.connection;
 
   const handleSuccess = () => {
     // Close the tab after successful creation/update

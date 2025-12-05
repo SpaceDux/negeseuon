@@ -1,62 +1,33 @@
 import { StrictMode } from "react";
 import "@renderer/globals.css";
 import { Base } from "@renderer/libs/components/Base";
-import { type Connection } from "@renderer/libs/components/Sidebar";
 import { Home } from "@renderer/views/Home";
-import { TopicView } from "@renderer/views/tabs/TopicView";
-import { ConnectionConfigView } from "@renderer/views/tabs/ConnectionConfigView";
 import { TabProvider, useTabs } from "@renderer/libs/hooks/useTabs";
+import { useRegisterTabTypes } from "@renderer/libs/hooks/registerTabTypes";
 import { Toaster } from "@renderer/libs/shadcn/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 function AppContent() {
-  const { tabs, activeTabId, openTab } = useTabs();
+  const { tabs, activeTabId, getTabRenderer } = useTabs();
+  useRegisterTabTypes();
   const hasTabs = tabs.length > 0;
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
-
-  const handleConnectionSelect = (connection: Connection) => {
-    console.log("Selected connection:", connection);
-    // TODO: Implement connection selection logic
-  };
-
-  const handleAddConnection = () => {
-    openTab("connection_config", {});
-  };
-
-  const handleDisconnect = (connection: Connection) => {
-    console.log("Disconnect connection:", connection);
-    // TODO: Implement disconnect logic
-  };
-
-  const handleModifyConnection = (connection: Connection) => {
-    console.log("Modify connection:", connection);
-    // TODO: Implement modify connection dialog/modal
-  };
 
   const renderActiveView = () => {
     if (!activeTab) {
       return <Home />;
     }
 
-    switch (activeTab.type) {
-      case "kafka":
-        return <TopicView />;
-      case "connection_config":
-        return <ConnectionConfigView />;
-      default:
-        return <Home />;
+    const Renderer = getTabRenderer(activeTab);
+    if (!Renderer) {
+      return <Home />;
     }
+
+    return <Renderer context={activeTab.context} />;
   };
 
   return (
-    <Base
-      sidebarProps={{
-        onConnectionSelect: handleConnectionSelect,
-        onAddConnection: handleAddConnection,
-        onDisconnect: handleDisconnect,
-        onModifyConnection: handleModifyConnection,
-      }}
-    >
+    <Base>
       {hasTabs ? renderActiveView() : <Home />}
     </Base>
   );

@@ -118,17 +118,13 @@ export function TabBar({ className }: TabBarProps) {
           >
             <div className="flex-1 min-w-0">
               <div className="truncate font-medium leading-tight">
-                {tab.type === "kafka"
-                  ? tab.context.topicName
-                  : tab.context.connectionName || "New Connection"}
+                {tab.metadata.title}
               </div>
-              <div className="truncate text-xs text-muted-foreground leading-tight mt-0.5">
-                {tab.type === "kafka"
-                  ? tab.context.connectionName
-                  : tab.context.connectionId
-                    ? "Edit Connection"
-                    : "Add Connection"}
-              </div>
+              {tab.metadata.subtitle && (
+                <div className="truncate text-xs text-muted-foreground leading-tight mt-0.5">
+                  {tab.metadata.subtitle}
+                </div>
+              )}
             </div>
             <Button
               variant="ghost"

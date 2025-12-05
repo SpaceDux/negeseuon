@@ -1,4 +1,3 @@
-import { useTabs } from "@renderer/libs/hooks/useTabs";
 import {
   Card,
   CardContent,
@@ -6,38 +5,28 @@ import {
   CardHeader,
   CardTitle,
 } from "@renderer/libs/shadcn/components/ui/card";
+import type { ConnectorConfiguration } from "@negeseuon/schemas";
 
-export function TopicView() {
-  const { tabs, activeTabId } = useTabs();
-  const activeTab = tabs.find((tab) => tab.id === activeTabId);
+interface TopicViewContext {
+  connection: ConnectorConfiguration;
+  topic: string;
+}
 
-  if (!activeTab) {
-    return (
-      <div className="flex h-full items-center justify-center p-8">
-        <div className="text-center text-muted-foreground">
-          <p className="text-lg font-medium">No topic selected</p>
-          <p className="text-sm mt-2">
-            Click on a topic in the sidebar to open it
-          </p>
-        </div>
-      </div>
-    );
-  }
+interface TopicViewProps {
+  context: TopicViewContext;
+}
 
-  // Only render if it's a kafka tab
-  if (activeTab.type !== "kafka") {
-    return null;
-  }
-
-  const { context } = activeTab;
+export function TopicView({ context }: TopicViewProps) {
+  const { connection, topic } = context;
+  const topicName = typeof topic === "string" ? topic : (topic as any)?.name || "";
+  const connectionName = connection.name || "";
 
   return (
     <div className="flex h-full flex-col overflow-auto p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">{context.topicName}</h1>
+        <h1 className="text-2xl font-bold">{topicName}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {context.connectionName} • {context.connection.host}:
-          {context.connection.port}
+          {connectionName} • {connection.config.bootstrapBrokers.join(", ")}
         </p>
       </div>
 
@@ -55,20 +44,20 @@ export function TopicView() {
                 <p className="text-sm font-medium text-muted-foreground">
                   Topic Name
                 </p>
-                <p className="text-sm font-mono mt-1">{context.topicName}</p>
+                <p className="text-sm font-mono mt-1">{topicName}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
                   Connection
                 </p>
-                <p className="text-sm mt-1">{context.connectionName}</p>
+                <p className="text-sm mt-1">{connectionName}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
                   Endpoint
                 </p>
                 <p className="text-sm font-mono mt-1">
-                  {context.connection.host}:{context.connection.port}
+                  {connection.config.bootstrapBrokers.join(", ")}
                 </p>
               </div>
             </div>
