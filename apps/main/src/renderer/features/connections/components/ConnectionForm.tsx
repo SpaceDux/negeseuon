@@ -29,8 +29,9 @@ import {
 import { Spinner } from "@renderer/libs/shadcn/components/ui/spinner";
 import type { ConnectorConfiguration, KafkaConfiguration } from "@negeseuon/schemas";
 import { useConnections } from "../hooks/useConnections";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useTestConnection } from "../hooks/useTestConnection";
+import { useConnectionManager } from "../context";
 
 interface ConnectionFormProps {
   initialData?: ConnectorConfiguration;
@@ -116,7 +117,7 @@ export function ConnectionForm({
 }: ConnectionFormProps) {
   const { upsertConnection } = useConnections();
   const { testConnection } = useTestConnection();
-  const queryClient = useQueryClient();
+  const { refreshConnections } = useConnectionManager();
 
   const form = useForm<FormValues>({
     defaultValues: configToFormValues(initialData),
@@ -126,10 +127,10 @@ export function ConnectionForm({
 
   const { mutate: mutateUpsertConnection, isPending: isUpserting } = useMutation({
     mutationFn: (values: FormValues) => upsertConnection(formValuesToConfig(values)),
-    onSuccess: (value) => {
+    onSuccess: async (value) => {
       if (value.success) {
         toast.success(value.message);
-        queryClient.invalidateQueries({ queryKey: ["list-connections"] });
+        await refreshConnections();
         onSuccess?.();
       } else {
         toast.error(value.message);

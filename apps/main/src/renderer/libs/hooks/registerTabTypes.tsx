@@ -1,5 +1,5 @@
 import { useTabs } from "./useTabs";
-import { TopicView } from "@renderer/views/tabs/TopicView";
+import { KafkaTopicView } from "@renderer/views/tabs/KafkaTopicView";
 import { ConnectionConfigView } from "@renderer/views/tabs/ConnectionConfigView";
 import type { ConnectorConfiguration } from "@negeseuon/schemas";
 import { useEffect } from "react";
@@ -35,7 +35,7 @@ export function useRegisterTabTypes() {
           subtitle: connectionName,
         };
       },
-      component: TopicView,
+      component: KafkaTopicView,
     });
 
     // Register Connection Config tab type

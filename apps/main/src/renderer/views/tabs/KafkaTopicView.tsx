@@ -7,24 +7,24 @@ import {
 } from "@renderer/libs/shadcn/components/ui/card";
 import type { ConnectorConfiguration } from "@negeseuon/schemas";
 
-interface TopicViewContext {
+interface KafkaTopicViewContext {
   connection: ConnectorConfiguration;
   topic: string;
 }
 
-interface TopicViewProps {
-  context: TopicViewContext;
+interface KafkaTopicViewProps {
+  context: KafkaTopicViewContext;
 }
 
-export function TopicView({ context }: TopicViewProps) {
+export function KafkaTopicView({ context }: KafkaTopicViewProps) {
   const { connection, topic } = context;
-  const topicName = typeof topic === "string" ? topic : (topic as any)?.name || "";
   const connectionName = connection.name || "";
+  const isConnected = connection.connected;
 
   return (
     <div className="flex h-full flex-col overflow-auto p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">{topicName}</h1>
+        <h1 className="text-2xl font-bold">{topic}</h1>
         <p className="text-sm text-muted-foreground mt-1">
           {connectionName} • {connection.config.bootstrapBrokers.join(", ")}
         </p>
@@ -44,7 +44,7 @@ export function TopicView({ context }: TopicViewProps) {
                 <p className="text-sm font-medium text-muted-foreground">
                   Topic Name
                 </p>
-                <p className="text-sm font-mono mt-1">{topicName}</p>
+                <p className="text-sm font-mono mt-1">{topic}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">

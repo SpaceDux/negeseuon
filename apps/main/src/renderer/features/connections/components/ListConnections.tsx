@@ -3,8 +3,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@renderer/libs/shadcn/components/ui/collapsible";
-import { useConnections } from "../hooks/useConnections";
-import { useQuery } from "@tanstack/react-query";
+import { useConnectionManager } from "../context";
 import { Button } from "@renderer/libs/shadcn/components/ui/button";
 import { ChevronDown, ChevronRight, Layers, Settings } from "lucide-react";
 import { cn } from "@renderer/libs/shadcn/lib/utils";
@@ -16,17 +15,13 @@ import { useMemo, createRef, useState } from "react";
 import { ListTopics } from "@renderer/features/connector/components/ListTopics";
 
 export function ListConnections() {
-  const { listConnections } = useConnections();
+  const { getAllConnections, isLoading } = useConnectionManager();
   const { openTab } = useTabs();
   const [expandedConnections, setExpandedConnections] = useState<Set<number>>(
     new Set()
   );
 
-  const { isLoading, data, isError, error } = useQuery({
-    queryKey: ["list-connections"],
-    queryFn: listConnections,
-    enabled: true,
-  });
+  const data = getAllConnections();
 
   const buttonRefs = useMemo(() => {
     if (!data)
@@ -51,12 +46,8 @@ export function ListConnections() {
     );
   }
 
-  if (isError) {
-    return <div>Error: {error?.message}</div>;
-  }
-
-  if (!data) {
-    return <div>No data</div>;
+  if (!data || data.length === 0) {
+    return <div>No connections found</div>;
   }
 
   const toggleConnection = (connection: ConnectorConfiguration) => {
@@ -87,9 +78,15 @@ export function ListConnections() {
     ref?.current?.click();
   };
 
-  const getConnectionIcon = (type: "kafka", isConnected: boolean) => {
+  const getConnectionIcon = (type: "kafka" | "rabbitmq", isConnected: boolean) => {
     switch (type) {
       case "kafka":
+        return isConnected ? (
+          <Layers className="size-4 text-green-600" />
+        ) : (
+          <Layers className="size-4 text-muted-foreground" />
+        );
+      case "rabbitmq":
         return isConnected ? (
           <Layers className="size-4 text-green-600" />
         ) : (
@@ -142,7 +139,7 @@ export function ListConnections() {
   return (
     <div className="space-y-1 pr-2 pl-2 pt-2">
       {data.map((connection) => {
-        const isConnected = connection.connected;
+        const isConnected = connection.connected ?? false;
         const isExpanded = expandedConnections.has(connection.id!);
 
         return (

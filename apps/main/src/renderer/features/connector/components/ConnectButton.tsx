@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { cn } from "@renderer/libs/shadcn/lib/utils";
 import { ConnectorConfiguration } from "@negeseuon/schemas";
 import { Spinner } from "@renderer/libs/shadcn/components/ui/spinner";
+import { useConnectionManager } from "@renderer/features/connections/context";
 
 type Props = {
   connection: ConnectorConfiguration;
@@ -15,14 +16,13 @@ type Props = {
 export function ConnectButton({ connection, buttonRef }: Props) {
   const { connect, disconnect } = useConnector();
   const queryClient = useQueryClient();
+  const { refreshConnections } = useConnectionManager();
 
   const { mutate: mutateConnect, isPending: isConnecting } = useMutation({
     mutationFn: () => connect(connection.id!),
-    onSuccess: (value) => {
+    onSuccess: async (value) => {
       if (value.success) {
-        queryClient.invalidateQueries({
-          queryKey: ["list-connections"],
-        });
+        await refreshConnections();
         queryClient.invalidateQueries({
           queryKey: ["list-topics", connection.id],
         });
@@ -42,9 +42,9 @@ export function ConnectButton({ connection, buttonRef }: Props) {
 
   const { mutate: mutateDisconnect, isPending: isDisconnecting } = useMutation({
     mutationFn: () => disconnect(connection.id!),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Disconnected from connection");
-      queryClient.invalidateQueries({ queryKey: ["list-connections"] });
+      await refreshConnections();
       queryClient.invalidateQueries({
         queryKey: ["list-topics", connection.id],
       });

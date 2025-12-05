@@ -6,6 +6,7 @@ import { TabProvider, useTabs } from "@renderer/libs/hooks/useTabs";
 import { useRegisterTabTypes } from "@renderer/libs/hooks/registerTabTypes";
 import { Toaster } from "@renderer/libs/shadcn/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ConnectionManagerProvider } from "@renderer/features/connections/context";
 
 function AppContent() {
   const { tabs, activeTabId, getTabRenderer } = useTabs();
@@ -38,10 +39,12 @@ function App() {
   return (
     <StrictMode>
       <QueryClientProvider client={queryClient}>
-        <TabProvider>
-          <AppContent />
-          <Toaster />
-        </TabProvider>
+        <ConnectionManagerProvider>
+          <TabProvider>
+            <AppContent />
+            <Toaster />
+          </TabProvider>
+        </ConnectionManagerProvider>
       </QueryClientProvider>
     </StrictMode>
   );
