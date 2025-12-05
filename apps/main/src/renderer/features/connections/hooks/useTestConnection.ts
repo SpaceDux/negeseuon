@@ -1,4 +1,5 @@
 import { client } from "@renderer/renderer";
+import type { ConnectorConfiguration } from "@negeseuon/schemas";
 
 interface TestConnectionResult {
   success: boolean;
@@ -8,10 +9,10 @@ interface TestConnectionResult {
 }
 
 export function useTestConnection() {
-  const testConnection = async (config) => {
+  const testConnection = async (config: ConnectorConfiguration) => {
     try {
       const response = await client.connections.test.mutate({
-        type: "kafka",
+        type: config.type,
         config,
       });
 
@@ -25,9 +26,10 @@ export function useTestConnection() {
         error: error instanceof Error ? error.message : String(error),
       };
       return errorResult;
+    }
   };
 
   return {
     testConnection,
   };
-}
+};

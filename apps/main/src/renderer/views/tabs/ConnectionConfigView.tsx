@@ -21,10 +21,18 @@ export function ConnectionConfigView() {
 
   const handleSuccess = () => {
     // Close the tab after successful creation/update
+    if (!activeTabId) {
+      return;
+    }
+    
     closeTab(activeTabId);
   };
 
   const handleCancel = () => {
+    if (!activeTabId) {
+      return;
+    }
+    
     closeTab(activeTabId);
   };
 

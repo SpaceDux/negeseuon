@@ -1,6 +1,4 @@
 import { useForm } from "react-hook-form";
-import { useState } from "react";
-import { client } from "@renderer/renderer";
 import { toast } from "sonner";
 import {
   Form,
@@ -29,8 +27,10 @@ import {
   SelectValue,
 } from "@renderer/libs/shadcn/components/ui/select";
 import { Spinner } from "@renderer/libs/shadcn/components/ui/spinner";
-import type { ConnectorConfiguration } from "@negeseuon/schemas";
-import type { KafkaConfiguration } from "@negeseuon/schemas";
+import type { ConnectorConfiguration, KafkaConfiguration } from "@negeseuon/schemas";
+import { useConnections } from "../hooks/useConnections";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTestConnection } from "../hooks/useTestConnection";
 
 interface ConnectionFormProps {
   initialData?: ConnectorConfiguration;
@@ -38,16 +38,75 @@ interface ConnectionFormProps {
   onCancel?: () => void;
 }
 
+// Form values use string for bootstrapBrokers (comma-separated input)
 interface FormValues {
+  id?: number;
   name: string;
   description: string;
-  type: "kafka";
-  bootstrapBrokers: string;
-  timeout?: number;
-  saslMechanism?: "PLAIN" | "SCRAM-SHA-256" | "SCRAM-SHA-512" | "OAUTHBEARER";
-  saslUsername?: string;
-  saslPassword?: string;
-  saslToken?: string;
+  type: "kafka" | "rabbitmq";
+  connected: boolean;
+  config: {
+    bootstrapBrokers: string; // comma-separated in form
+    timeout?: number;
+    sasl?: {
+      mechanism: "PLAIN" | "SCRAM-SHA-512" | "SCRAM-SHA-256" | "OAUTHBEARER";
+      username?: string;
+      password?: string;
+      token?: string;
+    };
+  };
+}
+
+// Convert form values to the schema-expected format
+function formValuesToConfig(values: FormValues): ConnectorConfiguration {
+  const brokers = values.config.bootstrapBrokers
+    .split(",")
+    .map((b) => b.trim())
+    .filter(Boolean);
+
+  return {
+    id: values.id,
+    name: values.name,
+    description: values.description,
+    type: values.type,
+    connected: values.connected,
+    config: {
+      bootstrapBrokers: brokers,
+      timeout: values.config.timeout,
+      sasl: values.config.sasl?.mechanism ? values.config.sasl : undefined,
+    },
+  };
+}
+
+// Convert schema format to form values
+function configToFormValues(config?: ConnectorConfiguration): FormValues {
+  if (!config) {
+    return {
+      name: "",
+      description: "",
+      type: "kafka",
+      connected: false,
+      config: {
+        bootstrapBrokers: "",
+        timeout: undefined,
+        sasl: undefined,
+      },
+    };
+  }
+
+  const kafkaConfig = config.config as KafkaConfiguration;
+  return {
+    id: config.id,
+    name: config.name,
+    description: config.description,
+    type: config.type,
+    connected: config.connected,
+    config: {
+      bootstrapBrokers: kafkaConfig.bootstrapBrokers.join(", "),
+      timeout: kafkaConfig.timeout,
+      sasl: kafkaConfig.sasl,
+    },
+  };
 }
 
 export function ConnectionForm({
@@ -55,152 +114,56 @@ export function ConnectionForm({
   onSuccess,
   onCancel,
 }: ConnectionFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
-
-  // Parse initial data if editing
-  const getInitialValues = (): FormValues => {
-    if (initialData) {
-      const config = initialData.config as KafkaConfiguration;
-      return {
-        name: initialData.name,
-        description: initialData.description,
-        type: initialData.type,
-        bootstrapBrokers: config.bootstrapBrokers.join(","),
-        timeout: config.timeout,
-        saslMechanism: config.sasl?.mechanism,
-        saslUsername: config.sasl?.username,
-        saslPassword: config.sasl?.password,
-        saslToken: config.sasl?.token,
-      };
-    }
-    return {
-      name: "",
-      description: "",
-      type: "kafka",
-      bootstrapBrokers: "",
-      timeout: undefined,
-      saslMechanism: undefined,
-      saslUsername: undefined,
-      saslPassword: undefined,
-      saslToken: undefined,
-    };
-  };
+  const { upsertConnection } = useConnections();
+  const { testConnection } = useTestConnection();
+  const queryClient = useQueryClient();
 
   const form = useForm<FormValues>({
-    defaultValues: getInitialValues(),
+    defaultValues: configToFormValues(initialData),
   });
 
-  const saslMechanism = form.watch("saslMechanism");
+  const saslMechanism = form.watch("config.sasl.mechanism");
 
-  const buildKafkaConfig = (values: FormValues): KafkaConfiguration => {
-    const config: KafkaConfiguration = {
-      bootstrapBrokers: values.bootstrapBrokers
-        .split(",")
-        .map((b) => b.trim())
-        .filter(Boolean),
-    };
-
-    if (values.timeout) {
-      config.timeout = values.timeout;
-    }
-
-    if (values.saslMechanism) {
-      config.sasl = {
-        mechanism: values.saslMechanism,
-      };
-
-      if (values.saslMechanism === "OAUTHBEARER" && values.saslToken) {
-        config.sasl.token = values.saslToken;
-      } else if (
-        values.saslMechanism !== "OAUTHBEARER" &&
-        values.saslUsername &&
-        values.saslPassword
-      ) {
-        config.sasl.username = values.saslUsername;
-        config.sasl.password = values.saslPassword;
-      }
-    }
-
-    return config;
-  };
-
-  const handleTest = async (values: FormValues) => {
-    setIsTesting(true);
-    try {
-      const kafkaConfig = buildKafkaConfig(values);
-
-      const result = await client.connections.test.mutate({
-        type: "kafka",
-        config: {
-          name: values.name,
-          description: values.description,
-          type: "kafka",
-          config: kafkaConfig,
-          connected: false,
-        },
-      });
-
-      if (result.success) {
-        toast.success("Connection Test Successful", {
-          description: result.message,
-        });
-      } else {
-        toast.error("Connection Test Failed", {
-          description: result.message,
-        });
-      }
-    } catch (error) {
-      toast.error("Connection Test Failed", {
-        description:
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred",
-      });
-    } finally {
-      setIsTesting(false);
-    }
-  };
-
-  const onSubmit = async (values: FormValues) => {
-    setIsSubmitting(true);
-    try {
-      const kafkaConfig = buildKafkaConfig(values);
-
-      const connectionData: ConnectorConfiguration = {
-        ...(initialData?.id && { id: initialData.id }),
-        name: values.name,
-        description: values.description,
-        type: "kafka",
-        config: kafkaConfig,
-        connected: false,
-      };
-
-      const result = await client.connections.upsert.mutate(connectionData);
-
-      if (result.success) {
-        toast.success(
-          initialData?.id ? "Connection Updated" : "Connection Created",
-          {
-            description: result.message,
-          }
-        );
+  const { mutate: mutateUpsertConnection, isPending: isUpserting } = useMutation({
+    mutationFn: (values: FormValues) => upsertConnection(formValuesToConfig(values)),
+    onSuccess: (value) => {
+      if (value.success) {
+        toast.success(value.message);
+        queryClient.invalidateQueries({ queryKey: ["list-connections"] });
         onSuccess?.();
       } else {
-        toast.error("Failed to Save Connection", {
-          description: result.message,
-        });
+        toast.error(value.message);
       }
-    } catch (error) {
-      toast.error("Failed to Save Connection", {
-        description:
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    },
+    onError: (error) => {
+      toast.error("Failed to upsert connection", { description: error.message });
+    },
+  });
+
+  const { mutate: mutateTestConnection, isPending: isTesting } = useMutation({
+    mutationFn: (values: FormValues) => {
+      const config = formValuesToConfig(values);
+      return testConnection(config);
+    },
+    onSuccess: (value) => {
+      console.log(value);
+      if (value.success) {
+        toast.success("Connection test successful", { description: value.message });
+      } else {
+        toast.error("Connection test failed", { description: value.message });
+      }
+    },
+    onError: (error) => {
+      toast.error("Failed to test connection", { description: error.message });
+    },
+  });
+
+  const handleTest = (values: FormValues) => {
+    mutateTestConnection(values);
+  };
+
+  const onSubmit = (values: FormValues) => {
+    mutateUpsertConnection(values);
   };
 
   return (
@@ -273,7 +236,7 @@ export function ConnectionForm({
           <CardContent className="space-y-4">
             <FormField
               control={form.control}
-              name="bootstrapBrokers"
+              name="config.bootstrapBrokers"
               rules={{
                 required: "Bootstrap brokers are required",
                 validate: (value) => {
@@ -292,8 +255,9 @@ export function ConnectionForm({
                   <FormLabel>Bootstrap Brokers</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="localhost:9092,broker2:9092"
+                      placeholder="localhost:9092, broker2:9092"
                       {...field}
+                      value={field.value || ""}
                     />
                   </FormControl>
                   <FormDescription>
@@ -306,10 +270,10 @@ export function ConnectionForm({
 
             <FormField
               control={form.control}
-              name="timeout"
+              name="config.timeout"
               rules={{
                 validate: (value) => {
-                  if (value !== undefined && (isNaN(value) || value <= 0)) {
+                  if (value !== undefined && (isNaN(value as number) || value as number <= 0)) {
                     return "Timeout must be a positive number";
                   }
                   return true;
@@ -328,7 +292,7 @@ export function ConnectionForm({
                           e.target.value ? Number(e.target.value) : undefined
                         )
                       }
-                      value={field.value || ""}
+                      value={field.value as number | undefined}
                     />
                   </FormControl>
                   <FormDescription>
@@ -351,12 +315,18 @@ export function ConnectionForm({
           <CardContent className="space-y-4">
             <FormField
               control={form.control}
-              name="saslMechanism"
+              name="config.sasl.mechanism"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>SASL Mechanism</FormLabel>
                   <Select
-                    onValueChange={field.onChange}
+                    onValueChange={(value) => {
+                      if (value === "none") {
+                        form.setValue("config.sasl", undefined);
+                      } else {
+                        field.onChange(value);
+                      }
+                    }}
                     value={field.value || "none"}
                   >
                     <FormControl>
@@ -387,7 +357,7 @@ export function ConnectionForm({
             {saslMechanism === "OAUTHBEARER" && (
               <FormField
                 control={form.control}
-                name="saslToken"
+                name="config.sasl.token"
                 rules={{
                   required:
                     saslMechanism === "OAUTHBEARER"
@@ -402,6 +372,7 @@ export function ConnectionForm({
                         type="password"
                         placeholder="Enter OAuth token"
                         {...field}
+                        value={field.value || ""}
                       />
                     </FormControl>
                     <FormDescription>
@@ -413,22 +384,19 @@ export function ConnectionForm({
               />
             )}
 
-            {saslMechanism && (
+            {saslMechanism && saslMechanism !== "OAUTHBEARER" && (
               <>
                 <FormField
                   control={form.control}
-                  name="saslUsername"
+                  name="config.sasl.username"
                   rules={{
-                    required:
-                      saslMechanism && saslMechanism !== "OAUTHBEARER"
-                        ? "Username is required"
-                        : false,
+                    required: "Username is required",
                   }}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Username</FormLabel>
                       <FormControl>
-                        <Input placeholder="admin" {...field} />
+                        <Input placeholder="admin" {...field} value={field.value || ""} />
                       </FormControl>
                       <FormDescription>
                         SASL username for authentication
@@ -440,12 +408,9 @@ export function ConnectionForm({
 
                 <FormField
                   control={form.control}
-                  name="saslPassword"
+                  name="config.sasl.password"
                   rules={{
-                    required:
-                      saslMechanism && saslMechanism !== "OAUTHBEARER"
-                        ? "Password is required"
-                        : false,
+                    required: "Password is required",
                   }}
                   render={({ field }) => (
                     <FormItem>
@@ -455,6 +420,7 @@ export function ConnectionForm({
                           type="password"
                           placeholder="••••••••"
                           {...field}
+                          value={field.value || ""}
                         />
                       </FormControl>
                       <FormDescription>
@@ -475,7 +441,7 @@ export function ConnectionForm({
               type="button"
               variant="outline"
               onClick={onCancel}
-              disabled={isSubmitting || isTesting}
+              disabled={isUpserting || isTesting}
             >
               Cancel
             </Button>
@@ -484,7 +450,7 @@ export function ConnectionForm({
             type="button"
             variant="outline"
             onClick={form.handleSubmit(handleTest)}
-            disabled={isSubmitting || isTesting}
+            disabled={isUpserting || isTesting}
           >
             {isTesting ? (
               <>
@@ -495,8 +461,8 @@ export function ConnectionForm({
               "Test Connection"
             )}
           </Button>
-          <Button type="submit" disabled={isSubmitting || isTesting}>
-            {isSubmitting ? (
+          <Button type="submit" disabled={isUpserting || isTesting}>
+            {isUpserting ? (
               <>
                 <Spinner className="mr-2" />
                 {initialData?.id ? "Updating..." : "Creating..."}
