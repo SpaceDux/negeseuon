@@ -10,10 +10,5 @@ export function useConnector() {
   const disconnect = async (connectionId: number) => {
     return await client.connectors.disconnect.mutate({ connectionId });
   };
-
-  const listTopics = async (connectionId: number) => {
-    return await client.connectors.topics.list.query({ connectionId });
-  };
-
-  return { connect, disconnect, listTopics };
+  return { connect, disconnect };
 }

@@ -12,7 +12,7 @@ import { useTabs } from "@renderer/libs/hooks/useTabs";
 import { ConnectorConfiguration } from "@negeseuon/schemas";
 import { ConnectButton } from "@renderer/features/connector/components/ConnectButton";
 import { useMemo, createRef, useState } from "react";
-import { ListTopics } from "@renderer/features/connector/components/ListTopics";
+import { ListTopics } from "@renderer/features/kafka/components/ListTopics";
 
 export function ListConnections() {
   const { getAllConnections, isLoading } = useConnectionManager();
@@ -78,7 +78,10 @@ export function ListConnections() {
     ref?.current?.click();
   };
 
-  const getConnectionIcon = (type: "kafka" | "rabbitmq", isConnected: boolean) => {
+  const getConnectionIcon = (
+    type: "kafka" | "rabbitmq",
+    isConnected: boolean
+  ) => {
     switch (type) {
       case "kafka":
         return isConnected ? (

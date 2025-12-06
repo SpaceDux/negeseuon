@@ -41,6 +41,8 @@ import { useConnectionManager } from "@renderer/features/connections/context";
 import { cn } from "@renderer/libs/shadcn/lib/utils";
 import TopicTopBar from "@renderer/features/kafka/components/TopicTopBar";
 import TopicTabs from "@renderer/features/kafka/components/TopicTabs";
+import useTopic from "@renderer/features/kafka/hooks/useTopic";
+import { useQuery } from "@tanstack/react-query";
 
 interface KafkaTopicViewContext {
   connection: ConnectorConfiguration;

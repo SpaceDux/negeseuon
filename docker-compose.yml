@@ -78,6 +78,26 @@ services:
       # List created topics
       echo 'Listing topics...'
       kafka-topics --list --bootstrap-server kafka:9094 --command-config /tmp/client.properties
+
+      # Produce batch messages to topic-1
+      echo 'Producing messages to topic-1...'
+      echo '{\"id\":1,\"message\":\"Hello from Kafka!\",\"timestamp\":\"2024-01-01T00:00:00Z\",\"source\":\"docker-compose\"}' > /tmp/topic1-messages.txt
+      echo '{\"id\":2,\"message\":\"Batch message 2\",\"timestamp\":\"2024-01-01T00:00:01Z\",\"source\":\"docker-compose\"}' >> /tmp/topic1-messages.txt
+      echo '{\"id\":3,\"message\":\"Batch message 3\",\"timestamp\":\"2024-01-01T00:00:02Z\",\"source\":\"docker-compose\"}' >> /tmp/topic1-messages.txt
+      echo '{\"id\":4,\"message\":\"Batch message 4\",\"timestamp\":\"2024-01-01T00:00:03Z\",\"source\":\"docker-compose\"}' >> /tmp/topic1-messages.txt
+      echo '{\"id\":5,\"message\":\"Batch message 5\",\"timestamp\":\"2024-01-01T00:00:04Z\",\"source\":\"docker-compose\"}' >> /tmp/topic1-messages.txt
+      cat /tmp/topic1-messages.txt | kafka-console-producer --bootstrap-server kafka:9094 --topic topic-1 --producer.config /tmp/client.properties
+
+      # Produce batch messages to topic-2
+      echo 'Producing messages to topic-2...'
+      echo '{\"id\":1,\"message\":\"Topic 2 message 1\",\"timestamp\":\"2024-01-01T00:00:00Z\",\"source\":\"docker-compose\"}' > /tmp/topic2-messages.txt
+      echo '{\"id\":2,\"message\":\"Topic 2 message 2\",\"timestamp\":\"2024-01-01T00:00:01Z\",\"source\":\"docker-compose\"}' >> /tmp/topic2-messages.txt
+      echo '{\"id\":3,\"message\":\"Topic 2 message 3\",\"timestamp\":\"2024-01-01T00:00:02Z\",\"source\":\"docker-compose\"}' >> /tmp/topic2-messages.txt
+      echo '{\"id\":4,\"message\":\"Topic 2 message 4\",\"timestamp\":\"2024-01-01T00:00:03Z\",\"source\":\"docker-compose\"}' >> /tmp/topic2-messages.txt
+      echo '{\"id\":5,\"message\":\"Topic 2 message 5\",\"timestamp\":\"2024-01-01T00:00:04Z\",\"source\":\"docker-compose\"}' >> /tmp/topic2-messages.txt
+      cat /tmp/topic2-messages.txt | kafka-console-producer --bootstrap-server kafka:9094 --topic topic-2 --producer.config /tmp/client.properties
+
+      echo 'Batch messages produced successfully!'
       "
     networks:
       - kafka-network

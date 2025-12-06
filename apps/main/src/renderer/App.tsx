@@ -7,6 +7,7 @@ import { useRegisterTabTypes } from "@renderer/libs/hooks/registerTabTypes";
 import { Toaster } from "@renderer/libs/shadcn/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConnectionManagerProvider } from "@renderer/features/connections/context";
+import { TopicMetadataProvider } from "@renderer/features/kafka/context";
 
 function AppContent() {
   const { tabs, activeTabId, getTabRenderer } = useTabs();
@@ -27,11 +28,7 @@ function AppContent() {
     return <Renderer context={activeTab.context} />;
   };
 
-  return (
-    <Base>
-      {hasTabs ? renderActiveView() : <Home />}
-    </Base>
-  );
+  return <Base>{hasTabs ? renderActiveView() : <Home />}</Base>;
 }
 
 function App() {
@@ -40,10 +37,12 @@ function App() {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <ConnectionManagerProvider>
-          <TabProvider>
-            <AppContent />
-            <Toaster />
-          </TabProvider>
+          <TopicMetadataProvider>
+            <TabProvider>
+              <AppContent />
+              <Toaster />
+            </TabProvider>
+          </TopicMetadataProvider>
         </ConnectionManagerProvider>
       </QueryClientProvider>
     </StrictMode>

@@ -22,3 +22,41 @@ export const KafkaConfigurationSchema = v.object({
 
 export type KafkaConfiguration = v.InferOutput<typeof KafkaConfigurationSchema>;
 
+export const KafkaTopicMetadataSchema = v.object({
+  id: v.string(),
+  brokers: v.map(
+    v.number(),
+    v.object({
+      host: v.string(),
+      port: v.number(),
+    })
+  ),
+  topics: v.map(
+    v.string(),
+    v.object({
+      id: v.string(),
+      partitions: v.array(
+        v.object({
+          leader: v.number(),
+          leaderEpoch: v.number(),
+          replicas: v.array(v.number()),
+        })
+      ),
+      partitionsCount: v.number(),
+      lastUpdate: v.number(),
+    })
+  ),
+  lastUpdate: v.number(),
+});
+
+export type KafkaTopicMetadata = v.InferOutput<typeof KafkaTopicMetadataSchema>;
+
+export const KafkaMessageSchema = v.object({
+  offset: v.number(),
+  partition: v.number(),
+  key: v.string(),
+  timestamp: v.string(),
+  payload: v.any(),
+  size: v.number(),
+  headers: v.optional(v.record(v.string(), v.string())),
+});

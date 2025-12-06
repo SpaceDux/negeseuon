@@ -1,7 +1,16 @@
 import { Connector } from "./connector.abstract";
 import { KafkaConfiguration, ConnectorType } from "@negeseuon/schemas";
 import { safeAsync } from "@negeseuon/utils";
-import { Admin, BaseOptions, Consumer, Producer } from "@platformatic/kafka";
+import {
+  Admin,
+  BaseOptions,
+  Consumer,
+  Message,
+  MessagesStreamModeValue,
+  MessagesStreamModes,
+  Producer,
+  TopicWithPartitionAndOffset,
+} from "@platformatic/kafka";
 
 export class KafkaConnector extends Connector<KafkaConfiguration> {
   #type: ConnectorType;
@@ -40,7 +49,7 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
     // Initialize consumer client
     this.#consumer = new Consumer({
       ...baseConfig,
-      groupId: `consumer-group-${this.id}`,
+      groupId: `consumer-group-${this.id}-${Date.now()}`,
     });
 
     // Initialize producer client
@@ -166,5 +175,131 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
     }
 
     return topics ?? [];
+  }
+
+  public async queryMessages(args: {
+    topic: string;
+    offset?: string;
+    limit?: string;
+    partition?: number;
+    avroDecode?: boolean;
+  }): Promise<Message[]> {
+    const { topic, offset, limit, partition, avroDecode } = args;
+    if (!this.#consumer) {
+      throw new Error("Connector is not connected");
+    }
+
+    const numericLimit = Number(limit);
+    if (!Number.isFinite(numericLimit) || numericLimit <= 0) {
+      throw new Error(`Invalid limit: ${limit}`);
+    }
+
+    const normalizedOffset = offset?.toLowerCase?.() ?? "latest";
+
+    let mode: MessagesStreamModeValue | undefined = undefined;
+    let offsets: TopicWithPartitionAndOffset[] | undefined;
+
+    if (
+      normalizedOffset === "earliest" ||
+      normalizedOffset === "latest" ||
+      normalizedOffset === "committed"
+    ) {
+      // Map string → MessagesStreamModes
+      switch (normalizedOffset) {
+        case "earliest":
+          mode = MessagesStreamModes.EARLIEST;
+          break;
+        case "committed":
+          mode = MessagesStreamModes.COMMITTED;
+          break;
+        case "latest":
+        default:
+          mode = MessagesStreamModes.LATEST;
+          break;
+      }
+    } else {
+      // Treat as explicit offset (manual mode)
+      let parsedOffset: bigint;
+      try {
+        parsedOffset = BigInt(offset ?? BigInt(0));
+      } catch {
+        throw new Error(
+          `Invalid offset: ${offset}. Use "earliest", "latest", "committed" or a numeric offset.`
+        );
+      }
+
+      mode = "manual";
+      offsets = [
+        {
+          topic,
+          offset: parsedOffset,
+          partition: partition ?? 0,
+        },
+      ];
+    }
+
+    // Create the consumer stream
+    const [stream, streamError] = await safeAsync(() =>
+      this.#consumer!.consume({
+        topics: [topic],
+        mode,
+        ...(offsets ? { offsets } : {}),
+      })
+    );
+
+    if (streamError) {
+      throw streamError;
+    }
+
+    const messages: Array<{
+      topic: string;
+      partition: number;
+      offset: bigint;
+      key: unknown;
+      value: unknown;
+      timestamp: bigint;
+      headers: Record<string, unknown>;
+    }> = [];
+
+    try {
+      for await (const message of stream!) {
+        console.dir(message, { depth: null });
+        if (partition !== undefined && message.partition !== partition) {
+          continue;
+        }
+
+        // NOTE: Avro decoding should be handled by deserializers/config.
+        // If avroDecode === true, ensure your Consumer is configured with
+        // an Avro deserializer for `value`.
+        const headersObj: Record<string, unknown> = {};
+        if (message.headers instanceof Map) {
+          for (const [k, v] of message.headers.entries()) {
+            headersObj[k.toString()] = v.toString();
+          }
+        } else if (message.headers) {
+          Object.assign(headersObj, message.headers as any);
+        }
+
+        messages.push({
+          topic: message.topic,
+          partition: message.partition,
+          offset: message.offset,
+          key: message.key,
+          value: message.value,
+          timestamp: message.timestamp,
+          headers: headersObj,
+        });
+
+        if (messages.length >= numericLimit) {
+          break;
+        }
+      }
+    } finally {
+      // Always close the stream
+      await stream!.close();
+    }
+
+    console.dir(messages, { depth: null });
+    return messages;
   }
 }

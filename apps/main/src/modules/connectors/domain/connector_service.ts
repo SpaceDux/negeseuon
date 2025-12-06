@@ -1,8 +1,9 @@
 import { ConnectionRepository } from "@/modules/connections/repository/connection";
 import { ConnectorOrchestrator } from "./orchestrator";
-import { BooleanResponse } from "@negeseuon/schemas";
+import { BooleanResponse, KafkaTopicMetadata } from "@negeseuon/schemas";
 import { supports } from "./connector.abstract";
 import { safeAsync } from "@negeseuon/utils";
+import { Message } from "@platformatic/kafka";
 
 type Dependencies = {
   repository: ConnectionRepository;
@@ -31,7 +32,7 @@ export class ConnectorService {
         );
     }
 
-    const [_, error] = await safeAsync(() => connector.connect());
+    const [_, error] = await safeAsync(() => connector!.connect());
     if (error) {
       console.error(error);
       await this.dependencies.repository.setConnected(connectionId, false);
@@ -149,6 +150,69 @@ export class ConnectorService {
     };
   }
 
+  /**
+   * Get the metadata of a topic
+   */
+  public async getTopicMetadata(
+    connectionId: number,
+    topic: string
+  ): Promise<KafkaTopicMetadata | null> {
+    const connector = this.dependencies.orchestrator.getConnector(connectionId);
+    if (!connector) {
+      throw new Error(`Connector with ID ${connectionId} not found`);
+    }
+
+    if (!connector.isConnected()) {
+      throw new Error(`Connector with ID ${connectionId} is not connected`);
+    }
+
+    if (!supports(connector, "getTopicMetadataByTopic")) {
+      throw new Error(
+        `Connector type ${connector.getType()} does not support getTopicMetadata operation`
+      );
+    }
+
+    return connector.getTopicMetadataByTopic(topic);
+  }
+
+  public async queryMessages({
+    connectionId,
+    topic,
+    offset,
+    limit,
+    partition,
+    avroDecode,
+  }: {
+    connectionId: number;
+    topic: string;
+    offset: string;
+    limit: string;
+    partition: number | null;
+    avroDecode: boolean;
+  }): Promise<Message[]> {
+    const connector = this.dependencies.orchestrator.getConnector(connectionId);
+    if (!connector) {
+      throw new Error(`Connector with ID ${connectionId} not found`);
+    }
+
+    if (!connector.isConnected()) {
+      throw new Error(`Connector with ID ${connectionId} is not connected`);
+    }
+
+    if (!supports(connector, "queryMessages")) {
+      throw new Error(
+        `Connector type ${connector.getType()} does not support queryMessages operation`
+      );
+    }
+
+    return connector.queryMessages({
+      ...(partition ? { partition } : {}),
+      topic,
+      offset,
+      limit,
+      avroDecode,
+    });
+  }
   /**
    * Get connector type for a connection
    */

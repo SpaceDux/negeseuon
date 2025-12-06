@@ -2,8 +2,8 @@ import { ConnectorConfiguration } from "@negeseuon/schemas";
 import { CollapsibleContent } from "@radix-ui/react-collapsible";
 import { useTabs } from "@renderer/libs/hooks/useTabs";
 import { useQuery } from "@tanstack/react-query";
-import { useConnector } from "../hooks/useConnector";
 import { Skeleton } from "@renderer/libs/shadcn/components/ui/skeleton";
+import useTopics from "../hooks/useTopics";
 
 type Props = {
   connection: ConnectorConfiguration;
@@ -11,7 +11,7 @@ type Props = {
 
 export const ListTopics = ({ connection }: Props) => {
   const { openTab } = useTabs();
-  const { listTopics } = useConnector();
+  const { listTopics } = useTopics();
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["list-topics", connection.id],
