@@ -10,6 +10,9 @@ import {
   MessagesStreamModes,
   Producer,
   TopicWithPartitionAndOffset,
+  jsonDeserializer,
+  noopDeserializer,
+  stringDeserializer,
 } from "@platformatic/kafka";
 
 export class KafkaConnector extends Connector<KafkaConfiguration> {
@@ -58,7 +61,7 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
     // Initialize admin client (for managing topics, partitions, etc.)
     this.#admin = new Admin(baseConfig);
 
-    const [topics, error] = await safeAsync(() => this.#admin!.listTopics());
+    const [_topics, error] = await safeAsync(() => this.#admin!.listTopics());
     if (error) {
       console.error(error);
       throw error;
@@ -238,11 +241,52 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
       ];
     }
 
+    // Get the latest offsets (high water marks) for the topic to know when to stop
+    let latestOffsets: Map<string, bigint[]> | null = null;
+    const targetPartition = partition ?? 0;
+    try {
+      const [offsetsResult, offsetsError] = await safeAsync(() =>
+        this.#consumer!.listOffsets({
+          topics: [topic],
+          partitions: { [topic]: [targetPartition] },
+        })
+      );
+      if (!offsetsError && offsetsResult) {
+        latestOffsets = offsetsResult;
+        console.log(`Latest offsets for ${topic}:`, latestOffsets);
+      }
+    } catch (error) {
+      console.warn(
+        "Failed to get latest offsets, will rely on limit only:",
+        error
+      );
+    }
+
+    // Get the latest offset for the target partition
+    // Latest offset is exclusive (next offset to be written), so last message is at latestOffset - 1
+    const latestOffset = latestOffsets?.get(topic)?.[targetPartition] ?? null;
+    console.log(
+      `Latest offset for ${topic} partition ${targetPartition}:`,
+      latestOffset,
+      latestOffset !== null
+        ? `(last message at offset ${latestOffset - 1n})`
+        : ""
+    );
+
     // Create the consumer stream
+    // Set maxFetches to limit how many fetch operations the stream performs
+    // This helps the stream stop after collecting messages instead of waiting indefinitely
+    const maxFetches = Math.ceil(numericLimit / 10) || 1; // Rough estimate: ~10 messages per fetch
+
     const [stream, streamError] = await safeAsync(() =>
       this.#consumer!.consume({
         topics: [topic],
         mode,
+        maxFetches,
+        deserializers: {
+          key: noopDeserializer,
+          value: noopDeserializer,
+        },
         ...(offsets ? { offsets } : {}),
       })
     );
@@ -261,6 +305,8 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
       headers: Record<string, unknown>;
     }> = [];
 
+    let streamClosed = false;
+    let shouldBreak = false;
     try {
       for await (const message of stream!) {
         console.dir(message, { depth: null });
@@ -290,16 +336,77 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
           headers: headersObj,
         });
 
+        console.log(
+          `Collected ${messages.length} messages, current offset: ${message.offset}, latest: ${latestOffset}`
+        );
+
+        // Check if we've reached the limit
         if (messages.length >= numericLimit) {
+          console.log(`Reached limit of ${numericLimit} messages, breaking`);
+          shouldBreak = true;
+          // Close stream immediately to stop it from waiting for more messages
+          try {
+            await stream!.close();
+            streamClosed = true;
+            console.log("Stream closed after reaching limit");
+          } catch (closeError) {
+            console.error("Error closing stream:", closeError);
+          }
+          break;
+        }
+
+        // Check if we've reached the latest offset (if we have it)
+        // The latest offset is exclusive (it's the next offset to be written)
+        // So the last available message is at latestOffset - 1
+        // We stop when current offset >= latestOffset - 1 (i.e., we've read the last message)
+        if (
+          latestOffset !== null &&
+          message.partition === targetPartition &&
+          message.offset >= latestOffset - 1n
+        ) {
+          console.log(
+            `Reached last available message at offset ${message.offset} (latest: ${latestOffset}), breaking`
+          );
+          shouldBreak = true;
+          // Close stream immediately to stop it from waiting for more messages
+          try {
+            await stream!.close();
+            streamClosed = true;
+            console.log("Stream closed after reaching latest offset");
+          } catch (closeError) {
+            console.error("Error closing stream:", closeError);
+          }
           break;
         }
       }
+      console.log(
+        `Finished consuming stream, collected ${messages.length} messages`
+      );
+    } catch (error) {
+      console.error("Error consuming stream:", error);
+      throw error;
     } finally {
       // Always close the stream
-      await stream!.close();
+      if (!streamClosed) {
+        console.log("Closing stream...");
+        try {
+          await stream!.close();
+          streamClosed = true;
+          console.log("Stream closed");
+        } catch (closeError) {
+          console.error("Error closing stream:", closeError);
+        }
+      }
     }
 
+    if (shouldBreak && messages.length === 0) {
+      console.warn(
+        "Stream broke but no messages collected - this might indicate an issue"
+      );
+    }
+
+    console.log(`Returning ${messages.length} messages from queryMessages`);
     console.dir(messages, { depth: null });
-    return messages;
+    return messages as any;
   }
 }

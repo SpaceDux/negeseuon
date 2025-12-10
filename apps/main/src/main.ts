@@ -52,6 +52,42 @@ function getUIIndexPath(): string {
   return fallbackPath;
 }
 
+/**
+ * Get the path to the app icon
+ */
+function getIconPath(): string | undefined {
+  // Try multiple possible locations for the icon
+  const possiblePaths = [
+    // Development: from .vite/build/, go to src/renderer/libs/assets/icon.png
+    path.resolve(__dirname, "../src/renderer/libs/assets/icon.png"),
+    // Alternative: if __dirname is already at apps/main level
+    path.resolve(__dirname, "./src/renderer/libs/assets/icon.png"),
+    // Production: from app.asar, the structure might be different
+    path.resolve(
+      process.resourcesPath,
+      "app/src/renderer/libs/assets/icon.png"
+    ),
+    // Fallback: try app path
+    path.resolve(app.getAppPath(), "src/renderer/libs/assets/icon.png"),
+  ];
+
+  // Find the first path that exists
+  for (const possiblePath of possiblePaths) {
+    try {
+      const normalizedPath = path.resolve(possiblePath);
+      if (fs.existsSync(normalizedPath)) {
+        console.log(`Found icon at: ${normalizedPath}`);
+        return normalizedPath;
+      }
+    } catch (error) {
+      // Continue to next path
+    }
+  }
+
+  console.warn("Icon not found in expected locations, using default");
+  return undefined;
+}
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
@@ -60,10 +96,31 @@ if (started) {
 let mainWindow: BrowserWindow | null = null;
 
 const createWindow = () => {
+  // Get the icon path
+  const iconPath = getIconPath();
+
+  // Set dock icon on macOS (must be done when app is ready)
+  if (process.platform === "darwin" && iconPath) {
+    try {
+      if (app.dock) {
+        app.dock.setIcon(iconPath);
+        console.log("Dock icon set to:", iconPath);
+      } else {
+        console.warn("app.dock is not available");
+      }
+    } catch (error) {
+      console.error("Failed to set dock icon:", error);
+      if (error instanceof Error) {
+        console.error("Error details:", error.message, error.stack);
+      }
+    }
+  }
+
   // Create the browser window.
   mainWindow = new BrowserWindow({
     width: 800,
     height: 800,
+    ...(iconPath && { icon: iconPath }),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -118,7 +175,13 @@ const createWindow = () => {
     mainWindow.webContents.openDevTools();
   }
 
-  createIPCHandler({ router, windows: [mainWindow] });
+  const ipcHandler = createIPCHandler({ router, windows: [mainWindow] });
+  console.log("=== IPC Handler created ===", {
+    routerKeys: Object.keys(router._def.procedures),
+    connectorsKeys: router._def.procedures.connectors
+      ? Object.keys(router._def.procedures.connectors._def.procedures)
+      : "N/A",
+  });
 };
 
 // This method will be called when Electron has finished
@@ -161,6 +224,9 @@ app.on("activate", () => {
 
 // Clean up on quit
 app.on("before-quit", async () => {
+  console.log("=== Before quit ===");
+  // TODO: We need to handle the connectors disconnection.
+
   // Close database connections
   try {
     await closeKnex();

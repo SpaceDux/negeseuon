@@ -117,52 +117,158 @@ export function createConnectorsRouter(dependencies: Dependencies) {
       )
       .output(wrap(v.array(KafkaMessageSchema)))
       .query(async ({ input }) => {
-        console.dir(input, { depth: null });
-        const { connectionId, topic, offset, limit, partition, avroDecode } =
-          input;
-        const messages = await dependencies.connectorService.queryMessages({
-          connectionId,
-          topic,
-          offset,
-          limit,
-          partition: partition ? Number(partition) : null,
-          avroDecode,
-        });
+        try {
+          const { connectionId, topic, offset, limit, partition, avroDecode } =
+            input;
+          const messages = await dependencies.connectorService.queryMessages({
+            connectionId,
+            topic,
+            offset,
+            limit,
+            partition: partition ? Number(partition) : null,
+            avroDecode,
+          });
 
-        // Transform Message objects to KafkaMessageSchema format
-        return messages.map((message) => {
-          // Convert headers from Map<Buffer, Buffer> to Record<string, string>
-          const headers: Record<string, string> = {};
-          if (message.headers instanceof Map) {
-            for (const [k, v] of message.headers.entries()) {
-              headers[k.toString()] = v.toString();
+          // Transform Message objects to KafkaMessageSchema format
+          const transformed = messages.map((message, index) => {
+            try {
+              // Convert headers - may be Map, Record, or already transformed
+              const headers: Record<string, string> = {};
+              if (message.headers instanceof Map) {
+                for (const [k, v] of message.headers.entries()) {
+                  headers[k.toString()] = v.toString();
+                }
+              } else if (
+                message.headers &&
+                typeof message.headers === "object"
+              ) {
+                // Already a Record/object
+                for (const [k, v] of Object.entries(message.headers)) {
+                  headers[k] = String(v);
+                }
+              }
+
+              // Handle value - it may already be deserialized (object/string) or still a Buffer
+              let payload: any;
+              let size: number;
+
+              if (Buffer.isBuffer(message.value)) {
+                // Value is still a Buffer, need to deserialize
+                try {
+                  const valueStr = message.value.toString();
+                  payload = JSON.parse(valueStr);
+                } catch {
+                  payload = message.value.toString();
+                }
+                size = message.value.length;
+              } else {
+                // Value is already deserialized (object, string, etc.)
+                payload = message.value;
+                // Calculate size from serialized representation
+                try {
+                  size = Buffer.byteLength(JSON.stringify(payload));
+                } catch {
+                  size = Buffer.byteLength(String(payload));
+                }
+              }
+
+              // Ensure payload is serializable (handle circular refs, functions, etc.)
+              try {
+                // Test serialization to catch any issues early
+                JSON.stringify(payload);
+              } catch (serializeError) {
+                // If payload can't be serialized, convert to string representation
+                payload = String(payload);
+                size = Buffer.byteLength(payload);
+              }
+
+              // Handle key - may be Buffer (from noopDeserializer) or already deserialized
+              let key = "";
+              if (message.key != null) {
+                if (Buffer.isBuffer(message.key)) {
+                  key = message.key.length > 0 ? message.key.toString() : "";
+                } else {
+                  key = String(message.key);
+                }
+              }
+
+              const result: any = {
+                offset: Number(message.offset),
+                partition: Number(message.partition),
+                key,
+                timestamp: String(message.timestamp),
+                payload,
+                size,
+              };
+
+              // Only include headers if there are any (omit property entirely if empty)
+              if (Object.keys(headers).length > 0) {
+                result.headers = headers;
+              }
+
+              // Validate the result matches schema expectations
+              if (typeof result.offset !== "number" || isNaN(result.offset)) {
+                throw new Error(`Invalid offset: ${message.offset}`);
+              }
+              if (
+                typeof result.partition !== "number" ||
+                isNaN(result.partition)
+              ) {
+                throw new Error(`Invalid partition: ${message.partition}`);
+              }
+              if (typeof result.key !== "string") {
+                throw new Error(`Invalid key type: ${typeof result.key}`);
+              }
+              if (typeof result.timestamp !== "string") {
+                throw new Error(
+                  `Invalid timestamp type: ${typeof result.timestamp}`
+                );
+              }
+              if (typeof result.size !== "number" || isNaN(result.size)) {
+                throw new Error(`Invalid size: ${result.size}`);
+              }
+
+              return result;
+            } catch (error) {
+              console.error(
+                `Error transforming message ${index}:`,
+                error,
+                message
+              );
+              throw error;
             }
-          }
+          });
 
-          // Convert value (Buffer) to payload
-          let payload: any;
+          // Validate the entire array before returning
           try {
-            // Try to parse as JSON first
-            const valueStr = message.value?.toString() ?? "";
-            payload = JSON.parse(valueStr);
-          } catch {
-            // If not JSON, use as string
-            payload = message.value?.toString() ?? "";
+            // Test serialization of the entire result
+            JSON.stringify(transformed);
+          } catch (serializeError) {
+            console.error(
+              "Failed to serialize transformed messages:",
+              serializeError
+            );
+            throw new Error(
+              `Failed to serialize messages: ${serializeError instanceof Error ? serializeError.message : String(serializeError)}`
+            );
           }
 
-          // Calculate size from value buffer
-          const size = message.value ? message.value.length : 0;
+          // Log first message for debugging
+          if (transformed.length > 0) {
+            console.log(
+              "First transformed message:",
+              JSON.stringify(transformed[0], null, 2)
+            );
+          }
 
-          return {
-            offset: Number(message.offset),
-            partition: message.partition,
-            key: message.key?.toString() ?? "",
-            timestamp: message.timestamp.toString(),
-            payload,
-            size,
-            headers: Object.keys(headers).length > 0 ? headers : undefined,
-          };
-        });
+          return transformed;
+        } catch (error) {
+          console.error("Error in queryMessages procedure:", error);
+          if (error instanceof Error) {
+            console.error("Error stack:", error.stack);
+          }
+          throw error;
+        }
       }),
     getType: t.procedure
       .input(

@@ -17,12 +17,25 @@ export default function Message(props: Props) {
   const { message, onClick } = props;
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
-  const formatPayload = (payload: string) => {
-    try {
-      return JSON.stringify(JSON.parse(payload), null, 2);
-    } catch {
-      return payload;
+  const formatPayload = (payload: string | any) => {
+    // If payload is already an object, stringify it directly
+    if (typeof payload === "object" && payload !== null) {
+      try {
+        return JSON.stringify(payload, null, 2);
+      } catch {
+        return String(payload);
+      }
     }
+    // If payload is a string, try to parse and format it
+    if (typeof payload === "string") {
+      try {
+        return JSON.stringify(JSON.parse(payload), null, 2);
+      } catch {
+        return payload;
+      }
+    }
+    // Fallback for other types
+    return String(payload);
   };
 
   return (
@@ -37,18 +50,14 @@ export default function Message(props: Props) {
           <div className="flex items-start justify-between px-4 py-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 text-sm">
-                <span className="text-muted-foreground">
-                  offset:{" "}
-                  <span className="text-foreground">{message.offset}</span>
+                <span className="text-xs font-mono bg-muted p-2 rounded-md overflow-x-auto">
+                  offset: {message.offset}
                 </span>
-                <span className="text-muted-foreground">•</span>
-                <span className="text-muted-foreground">
-                  partition:{" "}
-                  <span className="text-foreground">{message.partition}</span>
+                <span className="text-xs font-mono bg-muted p-2 rounded-md overflow-x-auto">
+                  partition: {message.partition}
                 </span>
-                <span className="text-muted-foreground">•</span>
-                <span className="text-muted-foreground">
-                  key: <span className="text-foreground">{message.key}</span>
+                <span className="text-xs font-mono bg-muted p-2 rounded-md overflow-x-auto">
+                  key: {message.key}
                 </span>
               </div>
               <div className="mt-1 text-xs text-muted-foreground">

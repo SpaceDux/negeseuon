@@ -27,7 +27,7 @@ export default function Messages(props: Props) {
     null
   );
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error } = useQuery<KafkaMessage[]>({
     queryKey: [
       "messages",
       connection.id,
@@ -37,15 +37,21 @@ export default function Messages(props: Props) {
       partition,
       avroDecode,
     ],
-    queryFn: () => {
-      return queryMessages({
-        connectionId: connection.id!,
-        topic,
-        offset,
-        limit,
-        partition,
-        avroDecode,
-      });
+    queryFn: async (): Promise<KafkaMessage[]> => {
+      try {
+        const result = await queryMessages({
+          connectionId: connection.id!,
+          topic,
+          offset,
+          limit,
+          partition,
+          avroDecode,
+        });
+        const messages = (result ?? []) as KafkaMessage[];
+        return messages;
+      } catch (err) {
+        throw err;
+      }
     },
     enabled: true,
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -56,7 +62,6 @@ export default function Messages(props: Props) {
   }
 
   if (isError) {
-    console.error(error, { depth: null });
     return <div>Error: {error?.message ?? "Unknown error"}</div>;
   }
 
@@ -70,7 +75,7 @@ export default function Messages(props: Props) {
             className="bg-black hover:bg-black/90"
           >
             <Play className="size-4 mr-2" />
-            Start Consumer
+            Consume
           </Button>
 
           <FilterMessages
@@ -104,7 +109,7 @@ export default function Messages(props: Props) {
         <div className="flex-1 flex flex-col overflow-hidden border-r border-border">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="text-sm text-muted-foreground">
-              {data?.length?.toLocaleString() ?? 0} messages
+              {(data as KafkaMessage[])?.length?.toLocaleString() ?? 0} messages
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon-sm">
