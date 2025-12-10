@@ -51,3 +51,6 @@ export const router = t.router({
 });
 
 export type AppRouter = typeof router;
+
+// Export connector service for direct access (e.g., during exit cleanup)
+export { connectorService };

@@ -96,6 +96,21 @@ export class ConnectorService {
   }
 
   /**
+   * Disconnect all connectors
+   */
+  public async disconnectAll(): Promise<BooleanResponse> {
+    let connectors = this.dependencies.orchestrator.getAllConnectors();
+    for (const connector of connectors) {
+      await this.disconnect(connector.id);
+    }
+
+    return {
+      success: true,
+      message: `Disconnected from all connections successfully`,
+    };
+  }
+
+  /**
    * List topics/queues/exchanges for a connector (broker-agnostic)
    * Works with any connector that implements the listTopics operation
    */

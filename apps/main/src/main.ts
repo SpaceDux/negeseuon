@@ -4,9 +4,9 @@ import fs from "node:fs";
 import started from "electron-squirrel-startup";
 import { createIPCHandler } from "electron-trpc/main";
 import { router } from "./router";
-import { getDatabase } from "@negeseuon/db";
 import { runMigrations } from "./libs/migrations";
-import { getKnex, closeKnex } from "./libs/knex";
+import { getKnex } from "./libs/knex";
+import { exit } from "./exit";
 
 /**
  * Get the path to the renderer's dist directory
@@ -128,6 +128,34 @@ const createWindow = () => {
     },
   });
 
+  // Handle window close - prevent default close, do cleanup, then close
+  mainWindow.on("close", async (event) => {
+    if (!isExiting) {
+      event.preventDefault();
+      isExiting = true;
+      console.log("Window close event fired, starting cleanup...");
+
+      try {
+        await exit();
+        console.log("Cleanup complete, destroying window and quitting");
+        const windowToDestroy = mainWindow;
+        mainWindow = null;
+        if (windowToDestroy && !windowToDestroy.isDestroyed()) {
+          windowToDestroy.destroy();
+        }
+        app.quit();
+      } catch (error) {
+        console.error("Error during exit cleanup:", error);
+        const windowToDestroy = mainWindow;
+        mainWindow = null;
+        if (windowToDestroy && !windowToDestroy.isDestroyed()) {
+          windowToDestroy.destroy();
+        }
+        app.exit(1);
+      }
+    }
+  });
+
   // Load the renderer app
   // Electron Forge's VitePlugin provides MAIN_WINDOW_VITE_LOAD_URL for production builds
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -205,35 +233,36 @@ app.on("ready", async () => {
   }
 });
 
+// Track if we're currently cleaning up to prevent multiple exit calls
+let isExiting = false;
+
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
-    app.quit();
+    // Don't call app.quit() here - let the window close handler do it
+    // This ensures cleanup happens before quit
   }
 });
 
-app.on("activate", () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
+// Also handle before-quit as a fallback (e.g., Cmd+Q on macOS)
+app.on("before-quit", async (event) => {
+  if (isExiting) {
+    return; // Already cleaning up
   }
-});
 
-// Clean up on quit
-app.on("before-quit", async () => {
-  console.log("=== Before quit ===");
-  // TODO: We need to handle the connectors disconnection.
+  console.log("before-quit event fired, starting cleanup...");
+  isExiting = true;
+  event.preventDefault(); // Prevent quitting until cleanup is done
 
-  // Close database connections
   try {
-    await closeKnex();
-    const dbManager = getDatabase();
-    dbManager.close();
-    console.log("Database connections closed");
+    await exit();
+    console.log("Cleanup complete, exiting app");
+    // After cleanup is complete, allow the app to quit
+    app.exit(0);
   } catch (error) {
-    console.error("Error closing database connections:", error);
+    console.error("Error during exit cleanup:", error);
+    app.exit(1);
   }
 });

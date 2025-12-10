@@ -44,6 +44,11 @@ export function createConnectorsRouter(dependencies: Dependencies) {
 
         return await dependencies.connectorService.disconnect(connectionId);
       }),
+    disconnectAll: t.procedure
+      .output(wrap(BooleanResponseSchema))
+      .mutation(async () => {
+        return await dependencies.connectorService.disconnectAll();
+      }),
     // Broker-agnostic operations
     topics: t.router({
       list: t.procedure
