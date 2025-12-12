@@ -81,10 +81,14 @@ export function createConnectorsRouter(dependencies: Dependencies) {
         .query(async ({ input }) => {
           const { connectionId, topic } = input;
 
-          return await dependencies.connectorService.getTopicMetadata(
+          const result = await dependencies.connectorService.getTopicMetadata(
             connectionId,
             topic
           );
+
+          console.log(result);
+
+          return result;
         }),
     }),
     publish: t.procedure

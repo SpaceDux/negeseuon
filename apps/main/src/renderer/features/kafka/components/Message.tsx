@@ -86,7 +86,7 @@ export default function Message(props: Props) {
             <div className="text-xs font-semibold mb-2 text-muted-foreground">
               MESSAGE PAYLOAD:
             </div>
-            <pre className="text-xs font-mono bg-muted p-3 rounded-md overflow-x-auto">
+            <pre className="text-xs font-mono bg-muted p-3 rounded-md overflow-x-auto whitespace-pre-wrap break-words">
               {formatPayload(message.payload)}
             </pre>
           </div>

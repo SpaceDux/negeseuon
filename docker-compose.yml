@@ -29,6 +29,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAKFA_PRINT_KEYS: "true"
     networks:
       - kafka-network
     healthcheck:
