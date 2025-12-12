@@ -180,6 +180,105 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
     return topics ?? [];
   }
 
+  /**
+   * Get metadata for a specific topic
+   */
+  public async getTopicMetadataByTopic(topic: string): Promise<any> {
+    if (!this.#admin) {
+      throw new Error("Connector is not connected");
+    }
+
+    const [metadata, error] = await safeAsync(() =>
+      this.#admin!.metadata({ topics: [topic] })
+    );
+
+    if (error) {
+      console.error(error);
+      throw error;
+    }
+
+    if (!metadata) {
+      return null;
+    }
+
+    // Transform the metadata to match the KafkaTopicMetadata schema
+    const brokers = new Map<number, { host: string; port: number }>();
+    const now = Date.now();
+
+    // Extract broker information
+    // metadata.brokers is a Map<number, Broker>
+    if (metadata.brokers) {
+      if (metadata.brokers instanceof Map) {
+        for (const [brokerId, broker] of metadata.brokers.entries()) {
+          brokers.set(brokerId, {
+            host: broker.host,
+            port: broker.port,
+          });
+        }
+      } else if (Array.isArray(metadata.brokers)) {
+        // Handle array case if needed
+        for (const broker of metadata.brokers as any[]) {
+          brokers.set(broker.id, {
+            host: broker.host,
+            port: broker.port,
+          });
+        }
+      }
+    }
+
+    const topics = new Map<string, any>();
+
+    // Extract topic information
+    // metadata.topics is a Map<string, ClusterTopicMetadata>
+    if (metadata.topics) {
+      if (metadata.topics instanceof Map) {
+        const topicMetadata = metadata.topics.get(topic);
+        if (topicMetadata) {
+          const partitions =
+            topicMetadata.partitions?.map((partition: any) => ({
+              leader: partition.leader ?? -1,
+              leaderEpoch: partition.leaderEpoch ?? 0,
+              replicas: partition.replicas ?? [],
+            })) ?? [];
+
+          topics.set(topic, {
+            id: topic,
+            partitions,
+            partitionsCount: partitions.length,
+            lastUpdate: now,
+          });
+        }
+      } else if (Array.isArray(metadata.topics)) {
+        // Handle array case if needed
+        for (const topicMetadata of metadata.topics as any[]) {
+          if (topicMetadata.name === topic) {
+            const partitions =
+              topicMetadata.partitions?.map((partition: any) => ({
+                leader: partition.leader ?? -1,
+                leaderEpoch: partition.leaderEpoch ?? 0,
+                replicas: partition.replicas ?? [],
+              })) ?? [];
+
+            topics.set(topic, {
+              id: topic,
+              partitions,
+              partitionsCount: partitions.length,
+              lastUpdate: now,
+            });
+            break;
+          }
+        }
+      }
+    }
+
+    return {
+      id: `metadata-${this.id}-${topic}-${now}`,
+      brokers,
+      topics,
+      lastUpdate: now,
+    };
+  }
+
   public async queryMessages(args: {
     topic: string;
     offset?: string;
