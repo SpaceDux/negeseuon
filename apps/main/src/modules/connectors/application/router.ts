@@ -86,8 +86,6 @@ export function createConnectorsRouter(dependencies: Dependencies) {
             topic
           );
 
-          console.log(result);
-
           return result;
         }),
     }),
