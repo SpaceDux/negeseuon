@@ -30,7 +30,6 @@ export default function TopicTabs({ topic, connection }: Props) {
         getTabState(activeTabId, "activeTab") &&
         activeTab !== getTabState(activeTabId, "activeTab")
       ) {
-        console.log(getTabState(activeTabId, "activeTab"));
         setActiveTab(getTabState(activeTabId, "activeTab") as string);
       }
     };
