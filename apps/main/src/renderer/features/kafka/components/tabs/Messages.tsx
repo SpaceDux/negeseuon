@@ -5,11 +5,11 @@ import { useState } from "react";
 import { ConnectorConfiguration } from "@negeseuon/schemas";
 import Message from "../Message";
 import { KafkaMessage } from "@renderer/libs/types/KafkaMessage";
-import SelectedMessage from "../SelectedMessage";
 import FilterMessages from "../FilterMessages";
 import { useQuery } from "@tanstack/react-query";
 import useMessages from "../../hooks/useMessages";
 import { Skeleton } from "@renderer/libs/shadcn/components/ui/skeleton";
+import SelectedMessage from "../SelectedMessage";
 
 type Props = {
   topic: string;
@@ -23,7 +23,6 @@ export default function Messages(props: Props) {
   const [limit, setLimit] = useState<string>("100");
   const [avroDecode, setAvroDecode] = useState<boolean>(false);
   const [partition, setPartition] = useState<number | "all">("all");
-
   const [selectedMessage, setSelectedMessage] = useState<KafkaMessage | null>(
     null
   );
@@ -61,7 +60,6 @@ export default function Messages(props: Props) {
   if (isLoading) {
     return (
       <TabsContent value="messages" className="flex-1 flex flex-col mt-0">
-        {/* Header Skeleton */}
         <div className="px-6 py-4 border-b border-border">
           <div className="flex items-center gap-4 flex-wrap">
             <Skeleton className="h-9 w-24 rounded-md" />
@@ -71,9 +69,7 @@ export default function Messages(props: Props) {
           </div>
         </div>
 
-        {/* Main Content Area Skeleton */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Message List Skeleton */}
           <div className="flex-1 flex flex-col overflow-hidden border-r border-border">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <Skeleton className="h-4 w-32 rounded-md" />
@@ -110,7 +106,6 @@ export default function Messages(props: Props) {
             </div>
           </div>
 
-          {/* Selected Message Panel Skeleton */}
           <div className="w-70 border-l border-border flex flex-col">
             <div className="px-4 py-3 border-b border-border">
               <Skeleton className="h-5 w-40 rounded-md" />
@@ -197,9 +192,7 @@ export default function Messages(props: Props) {
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Message List */}
+      <div className="flex-1 flex min-h-0 items-start">
         <div className="flex-1 flex flex-col overflow-hidden border-r border-border">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="text-sm text-muted-foreground">
@@ -220,8 +213,8 @@ export default function Messages(props: Props) {
               data.map((message) => {
                 return (
                   <Message
-                    onClick={() => setSelectedMessage?.(message)}
-                    key={`${message.partition}-${message.offset}`}
+                    key={`${message.partition}-${message.offset}-${topic}`}
+                    onClick={() => setSelectedMessage(message)}
                     message={message}
                   />
                 );
@@ -233,7 +226,6 @@ export default function Messages(props: Props) {
             )}
           </div>
         </div>
-
         <SelectedMessage
           message={selectedMessage}
           isOpen={selectedMessage !== null}

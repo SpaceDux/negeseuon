@@ -38,6 +38,8 @@ interface TabContextValue {
   reorderTabs: (fromIndex: number, toIndex: number) => void;
   registerTabType: <T>(type: string, definition: TabTypeDefinition<T>) => void;
   getTabRenderer: (tab: Tab) => ComponentType<{ context: unknown }> | null;
+  getTabState: <T>(tabId: string, key: string) => T | undefined;
+  setTabState: <T>(tabId: string, key: string, value: T) => void;
 }
 
 const TabContext = createContext<TabContextValue | undefined>(undefined);
@@ -48,13 +50,16 @@ const tabRegistry: TabRegistry = new Map();
 export function TabProvider({ children }: { children: ReactNode }) {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [tabState, setTabStateMap] = useState<
+    Map<string, Map<string, unknown>>
+  >(new Map());
 
-  const registerTabType = useCallback(<T,>(
-    type: string,
-    definition: TabTypeDefinition<T>
-  ) => {
-    tabRegistry.set(type, definition as TabTypeDefinition<unknown>);
-  }, []);
+  const registerTabType = useCallback(
+    <T,>(type: string, definition: TabTypeDefinition<T>) => {
+      tabRegistry.set(type, definition as TabTypeDefinition<unknown>);
+    },
+    []
+  );
 
   const openTab = useCallback(<T,>(type: string, context: T) => {
     const definition = tabRegistry.get(type);
@@ -111,6 +116,13 @@ export function TabProvider({ children }: { children: ReactNode }) {
 
         return newTabs;
       });
+
+      // Clean up tab state when tab is closed
+      setTabStateMap((prevState) => {
+        const newState = new Map(prevState);
+        newState.delete(tabId);
+        return newState;
+      });
     },
     [activeTabId]
   );
@@ -138,6 +150,30 @@ export function TabProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const getTabState = useCallback(
+    <T,>(tabId: string, key: string): T | undefined => {
+      const tabStateMap = tabState.get(tabId);
+      if (!tabStateMap) {
+        return undefined;
+      }
+      return tabStateMap.get(key) as T | undefined;
+    },
+    [tabState]
+  );
+
+  const setTabState = useCallback(
+    <T,>(tabId: string, key: string, value: T) => {
+      setTabStateMap((prevState) => {
+        const newState = new Map(prevState);
+        const tabStateMap = newState.get(tabId) || new Map();
+        tabStateMap.set(key, value);
+        newState.set(tabId, tabStateMap);
+        return newState;
+      });
+    },
+    []
+  );
+
   return (
     <TabContext.Provider
       value={{
@@ -151,6 +187,8 @@ export function TabProvider({ children }: { children: ReactNode }) {
         reorderTabs,
         registerTabType,
         getTabRenderer,
+        getTabState,
+        setTabState,
       }}
     >
       {children}

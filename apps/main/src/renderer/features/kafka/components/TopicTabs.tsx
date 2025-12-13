@@ -5,9 +5,10 @@ import {
 } from "@renderer/libs/shadcn/components/ui/tabs";
 import { List, Settings } from "lucide-react";
 import MessagesTab from "./tabs/Messages";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SettingsTab from "./tabs/Settings";
 import { ConnectorConfiguration } from "@negeseuon/schemas";
+import { useTabs } from "@renderer/libs/hooks/useTabs";
 
 type Props = {
   topic: string;
@@ -15,7 +16,25 @@ type Props = {
 };
 
 export default function TopicTabs({ topic, connection }: Props) {
+  const { activeTabId, setTabState, getTabState } = useTabs();
   const [activeTab, setActiveTab] = useState<string>("messages");
+
+  useEffect(() => {
+    if (activeTabId) {
+      setTabState(activeTabId, "activeTab", activeTab);
+    }
+
+    return () => {
+      if (
+        activeTabId &&
+        getTabState(activeTabId, "activeTab") &&
+        activeTab !== getTabState(activeTabId, "activeTab")
+      ) {
+        console.log(getTabState(activeTabId, "activeTab"));
+        setActiveTab(getTabState(activeTabId, "activeTab") as string);
+      }
+    };
+  }, [activeTabId, activeTab, setTabState]);
 
   return (
     <Tabs
