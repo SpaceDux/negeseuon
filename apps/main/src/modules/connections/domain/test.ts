@@ -47,7 +47,7 @@ export class TestConnection {
         id: -1,
         name: "Test Connection",
         description: "Temporary connection for testing",
-        type: input.type,
+        type: input.type as keyof ConnectorConfigMap,
         config: input.config,
       });
 

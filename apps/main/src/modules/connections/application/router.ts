@@ -1,5 +1,8 @@
 import { initTRPC } from "@trpc/server";
-import { ConnectorFactory } from "@/modules/connectors/domain/factory";
+import {
+  ConnectorConfigMap,
+  ConnectorFactory,
+} from "@/modules/connectors/domain/factory";
 import { Connector } from "@/modules/connectors/domain/connector.abstract";
 import {
   TestConnectionInputSchema,
@@ -74,7 +77,7 @@ export function createConnectionsRouter(dependencies: Dependencies) {
             id: -1,
             name: "Test Connection",
             description: "Temporary connection for testing",
-            type: input.type,
+            type: "kafka" as keyof ConnectorConfigMap,
             config: input.config.config,
           });
 

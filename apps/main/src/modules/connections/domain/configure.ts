@@ -4,7 +4,10 @@ import {
   ConnectorType,
 } from "@negeseuon/schemas";
 import { ConnectionRepository, ConnectionRow } from "../repository/connection";
-import { ConnectorFactory } from "@/modules/connectors/domain/factory";
+import {
+  ConnectorConfigMap,
+  ConnectorFactory,
+} from "@/modules/connectors/domain/factory";
 import { ConnectorOrchestrator } from "@/modules/connectors/domain/orchestrator";
 
 export interface UpsertConnectionResult {
@@ -16,7 +19,7 @@ export interface UpsertConnectionResult {
  * Domain service for managing connections
  * Handles business logic for creating and updating connections
  */
-export class ConfigureConnection {
+  export class ConfigureConnection {
   constructor(
     private readonly repository: ConnectionRepository,
     private readonly orchestrator: ConnectorOrchestrator
@@ -72,7 +75,7 @@ export class ConfigureConnection {
       id: connectionRow.id!,
       name: connectionRow.name,
       description: connectionRow.description,
-      type: connectionRow.type as ConnectorType,
+      type: connectionRow.type as keyof ConnectorConfigMap,
       config: JSON.parse(connectionRow.config),
     });
 
