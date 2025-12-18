@@ -10,9 +10,7 @@ import {
   MessagesStreamModes,
   Producer,
   TopicWithPartitionAndOffset,
-  jsonDeserializer,
   noopDeserializer,
-  stringDeserializer,
 } from "@platformatic/kafka";
 
 export class KafkaConnector extends Connector<KafkaConfiguration> {
@@ -298,27 +296,151 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
 
     const normalizedOffset = offset?.toLowerCase?.() ?? "latest";
 
+    // Get the latest offsets (high water marks) for the topic early, as we need them for "latest" mode
+    let latestOffsets: Map<string, bigint[]> | null = null;
+    const targetPartition = partition ?? 0;
+
+    // For "latest" mode, we need to get offsets for all partitions if partition is undefined
+    let partitionsToQuery: number[] = [];
+    if (partition !== undefined) {
+      partitionsToQuery = [partition];
+    } else if (
+      normalizedOffset === "latest" ||
+      normalizedOffset === "earliest"
+    ) {
+      // For "latest" or "earliest" with all partitions, we need to get all partition info
+      try {
+        const metadata = await this.getTopicMetadataByTopic(topic);
+        const topicData =
+          metadata.topics instanceof Map
+            ? metadata.topics.get(topic)
+            : (metadata.topics as Record<string, any>)[topic];
+        const partitionsCount = topicData?.partitionsCount ?? 1;
+        partitionsToQuery = Array.from(
+          { length: partitionsCount },
+          (_, i) => i
+        );
+      } catch (error) {
+        console.warn(
+          `Failed to get topic metadata for ${topic}, defaulting to partition 0:`,
+          error
+        );
+        partitionsToQuery = [0];
+      }
+    } else {
+      partitionsToQuery = [targetPartition];
+    }
+
+    try {
+      const [offsetsResult, offsetsError] = await safeAsync(() =>
+        this.#consumer!.listOffsets({
+          topics: [topic],
+          partitions: { [topic]: partitionsToQuery },
+        })
+      );
+      if (!offsetsError && offsetsResult) {
+        latestOffsets = offsetsResult;
+        console.log(`Latest offsets for ${topic}:`, latestOffsets);
+      }
+    } catch (error) {
+      console.warn(
+        "Failed to get latest offsets, will rely on limit only:",
+        error
+      );
+    }
+
     let mode: MessagesStreamModeValue | undefined = undefined;
     let offsets: TopicWithPartitionAndOffset[] | undefined;
 
-    if (
-      normalizedOffset === "earliest" ||
-      normalizedOffset === "latest" ||
-      normalizedOffset === "committed"
-    ) {
-      // Map string → MessagesStreamModes
-      switch (normalizedOffset) {
-        case "earliest":
-          mode = MessagesStreamModes.EARLIEST;
-          break;
-        case "committed":
-          mode = MessagesStreamModes.COMMITTED;
-          break;
-        case "latest":
-        default:
-          mode = MessagesStreamModes.LATEST;
-          break;
+    if (normalizedOffset === "earliest") {
+      // For "earliest", explicitly set offset to 0 to ensure we start from the beginning
+      // This is more reliable than using MessagesStreamModes.EARLIEST which may be affected
+      // by consumer group offsets or other factors
+      mode = "manual";
+
+      if (partition !== undefined) {
+        // Specific partition: set offset 0 for that partition
+        offsets = [
+          {
+            topic,
+            offset: 0n,
+            partition,
+          },
+        ];
+      } else {
+        // All partitions: use the partitions we discovered
+        offsets = partitionsToQuery.map((p) => ({
+          topic,
+          offset: 0n,
+          partition: p,
+        }));
       }
+    } else if (normalizedOffset === "latest") {
+      // For "latest", we want to read the most recent N messages
+      // Calculate starting offset as max(0, latestOffset - limit) for each partition
+      mode = "manual";
+
+      if (partition !== undefined) {
+        // Specific partition: calculate starting offset
+        const latestOffset = latestOffsets?.get(topic)?.[partition] ?? 0n;
+        // Latest offset is exclusive (next offset to be written), so last message is at latestOffset - 1
+        // We want to read from (latestOffset - limit) but not less than 0
+        // If latestOffset is 0, there are no messages, so we can't read anything
+        let startOffset = 0n;
+        if (latestOffset > 0n) {
+          if (latestOffset > BigInt(numericLimit)) {
+            startOffset = latestOffset - BigInt(numericLimit);
+          } else {
+            // Fewer messages than limit, start from beginning
+            startOffset = 0n;
+          }
+        }
+
+        console.log(
+          `Latest mode: partition ${partition}, latestOffset: ${latestOffset}, startOffset: ${startOffset}, limit: ${numericLimit}`
+        );
+
+        offsets = [
+          {
+            topic,
+            offset: startOffset,
+            partition,
+          },
+        ];
+      } else {
+        // All partitions: calculate starting offset for each
+        offsets = partitionsToQuery
+          .map((p) => {
+            const latestOffset = latestOffsets?.get(topic)?.[p] ?? 0n;
+            let startOffset = 0n;
+            if (latestOffset > 0n) {
+              if (latestOffset > BigInt(numericLimit)) {
+                startOffset = latestOffset - BigInt(numericLimit);
+              } else {
+                startOffset = 0n;
+              }
+            }
+            return {
+              topic,
+              offset: startOffset,
+              partition: p,
+            };
+          })
+          .filter((offset) => {
+            // Filter out partitions with no messages (latestOffset = 0)
+            const latestOffset =
+              latestOffsets?.get(topic)?.[offset.partition] ?? 0n;
+            return latestOffset > 0n;
+          });
+
+        console.log(
+          `Latest mode: all partitions, calculated offsets:`,
+          offsets
+        );
+      }
+    } else if (normalizedOffset === "committed") {
+      // Use committed mode for committed offset
+      mode = MessagesStreamModes.COMMITTED;
     } else {
       // Treat as explicit offset (manual mode)
       let parsedOffset: bigint;
@@ -340,27 +462,6 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
       ];
     }
 
-    // Get the latest offsets (high water marks) for the topic to know when to stop
-    let latestOffsets: Map<string, bigint[]> | null = null;
-    const targetPartition = partition ?? 0;
-    try {
-      const [offsetsResult, offsetsError] = await safeAsync(() =>
-        this.#consumer!.listOffsets({
-          topics: [topic],
-          partitions: { [topic]: [targetPartition] },
-        })
-      );
-      if (!offsetsError && offsetsResult) {
-        latestOffsets = offsetsResult;
-        console.log(`Latest offsets for ${topic}:`, latestOffsets);
-      }
-    } catch (error) {
-      console.warn(
-        "Failed to get latest offsets, will rely on limit only:",
-        error
-      );
-    }
-
     // Get the latest offset for the target partition
     // Latest offset is exclusive (next offset to be written), so last message is at latestOffset - 1
     const latestOffset = latestOffsets?.get(topic)?.[targetPartition] ?? null;
@@ -377,22 +478,55 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
     // This helps the stream stop after collecting messages instead of waiting indefinitely
     const maxFetches = Math.ceil(numericLimit / 10) || 1; // Rough estimate: ~10 messages per fetch
 
+    console.log(`Consuming with mode: ${mode}, offsets:`, offsets);
+
+    // If we're using manual mode but have no valid offsets, return empty array
+    if (mode === "manual" && (!offsets || offsets.length === 0)) {
+      console.warn(
+        "Manual mode requested but no valid offsets found, returning empty array"
+      );
+      return [];
+    }
+
+    const consumeOptions: any = {
+      topics: [topic],
+      mode,
+      maxFetches,
+      deserializers: {
+        key: noopDeserializer,
+        value: noopDeserializer,
+      },
+    };
+
+    if (offsets && offsets.length > 0) {
+      consumeOptions.offsets = offsets;
+      console.log(
+        `Using manual offsets:`,
+        JSON.stringify(offsets, (key, value) =>
+          typeof value === "bigint" ? value.toString() : value
+        )
+      );
+    }
+
     const [stream, streamError] = await safeAsync(() =>
-      this.#consumer!.consume({
-        topics: [topic],
-        mode,
-        maxFetches,
-        deserializers: {
-          key: noopDeserializer,
-          value: noopDeserializer,
-        },
-        ...(offsets ? { offsets } : {}),
-      })
+      this.#consumer!.consume(consumeOptions)
     );
 
     if (streamError) {
+      console.error("Error creating consumer stream:", streamError);
       throw streamError;
     }
+
+    if (!stream) {
+      throw new Error("Failed to create consumer stream");
+    }
+
+    console.log(
+      "Consumer stream created successfully, starting to read messages..."
+    );
+    console.log(
+      `Stream details: mode=${mode}, hasOffsets=${!!offsets && offsets.length > 0}`
+    );
 
     const messages: Array<{
       topic: string;
@@ -406,10 +540,31 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
 
     let streamClosed = false;
     let shouldBreak = false;
+    let messageCount = 0;
+    const startTime = Date.now();
+    const timeout = 30000; // 30 second timeout
+
     try {
+      console.log("Entering message consumption loop...");
       for await (const message of stream!) {
+        messageCount++;
+        const elapsed = Date.now() - startTime;
+        console.log(
+          `Received message ${messageCount} after ${elapsed}ms: partition=${message.partition}, offset=${message.offset}`
+        );
         console.dir(message, { depth: null });
+
+        // Check for timeout
+        if (elapsed > timeout) {
+          console.warn(`Timeout reached after ${elapsed}ms, breaking`);
+          shouldBreak = true;
+          break;
+        }
+
         if (partition !== undefined && message.partition !== partition) {
+          console.log(
+            `Skipping message from partition ${message.partition} (requested: ${partition})`
+          );
           continue;
         }
 
@@ -504,7 +659,25 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
       );
     }
 
-    console.log(`Returning ${messages.length} messages from queryMessages`);
+    console.log(
+      `Returning ${messages.length} messages from queryMessages (mode: ${mode}, requested limit: ${numericLimit})`
+    );
+    if (messages.length === 0) {
+      console.warn(
+        `No messages returned! Mode: ${mode}, Offsets: ${JSON.stringify(
+          offsets,
+          (key, value) => (typeof value === "bigint" ? value.toString() : value)
+        )}, Latest offsets: ${
+          latestOffsets
+            ? JSON.stringify(
+                Array.from(latestOffsets.entries()),
+                (key, value) =>
+                  typeof value === "bigint" ? value.toString() : value
+              )
+            : "null"
+        }`
+      );
+    }
     console.dir(messages, { depth: null });
     return messages as any;
   }

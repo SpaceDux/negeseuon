@@ -6,7 +6,7 @@ import {
   SelectContent,
 } from "@renderer/libs/shadcn/components/ui/select";
 import { Label } from "@renderer/libs/shadcn/components/ui/label";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@renderer/libs/shadcn/components/ui/input";
 import PartitionsSelectDropdown from "./PartitionsSelectDropdown";
 import { Checkbox } from "@renderer/libs/shadcn/components/ui/checkbox";
@@ -15,6 +15,10 @@ import { ConnectorConfiguration } from "@negeseuon/schemas";
 type Props = {
   connection: ConnectorConfiguration;
   topic: string;
+  offset?: string;
+  limit?: string;
+  partition?: "all" | number;
+  avroDecode?: boolean;
   onChange: (
     offset: string,
     limit: string,
@@ -23,13 +27,43 @@ type Props = {
   ) => void;
 };
 export default function FilterMessages(props: Props) {
-  const { connection, topic, onChange } = props;
-  const [offset, setOffset] = useState<string>("earliest");
-  const [limit, setLimit] = useState<string>("100");
-  const [partition, setPartition] = useState<"all" | number>("all");
-  const [avroDecode, setAvroDecode] = useState<boolean>(false);
+  const {
+    connection,
+    topic,
+    onChange,
+    offset: propOffset,
+    limit: propLimit,
+    partition: propPartition,
+    avroDecode: propAvroDecode,
+  } = props;
+  const [offset, setOffset] = useState<string>(propOffset ?? "earliest");
+  const [limit, setLimit] = useState<string>(propLimit ?? "100");
+  const [partition, setPartition] = useState<"all" | number>(
+    propPartition ?? "all"
+  );
+  const [avroDecode, setAvroDecode] = useState<boolean>(
+    propAvroDecode ?? false
+  );
+
+  // Sync with props when they change
+  useEffect(() => {
+    if (propOffset !== undefined) setOffset(propOffset);
+  }, [propOffset]);
+  useEffect(() => {
+    if (propLimit !== undefined) setLimit(propLimit);
+  }, [propLimit]);
+  useEffect(() => {
+    if (propPartition !== undefined) setPartition(propPartition);
+  }, [propPartition]);
+  useEffect(() => {
+    if (propAvroDecode !== undefined) setAvroDecode(propAvroDecode);
+  }, [propAvroDecode]);
 
   const handleOffsetChange = (value: string) => {
+    console.log("FilterMessages handleOffsetChange:", {
+      oldValue: offset,
+      newValue: value,
+    });
     setOffset(value);
     onChange(value, limit, partition, avroDecode);
   };

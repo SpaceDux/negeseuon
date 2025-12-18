@@ -1,12 +1,12 @@
 import { Button } from "@renderer/libs/shadcn/components/ui/button";
 import { TabsContent } from "@renderer/libs/shadcn/components/ui/tabs";
 import { Code, Download, Filter, Play } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ConnectorConfiguration } from "@negeseuon/schemas";
 import Message from "../Message";
 import { KafkaMessage } from "@renderer/libs/types/KafkaMessage";
 import FilterMessages from "../FilterMessages";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import useMessages from "../../hooks/useMessages";
 import { Skeleton } from "@renderer/libs/shadcn/components/ui/skeleton";
 import SelectedMessage from "../SelectedMessage";
@@ -19,6 +19,7 @@ type Props = {
 export default function Messages(props: Props) {
   const { topic, connection } = props;
   const { queryMessages } = useMessages();
+  const queryClient = useQueryClient();
   const [offset, setOffset] = useState<string>("earliest");
   const [limit, setLimit] = useState<string>("100");
   const [avroDecode, setAvroDecode] = useState<boolean>(false);
@@ -27,35 +28,85 @@ export default function Messages(props: Props) {
     null
   );
 
-  const { data, isLoading, isError, error } = useQuery<KafkaMessage[]>({
-    queryKey: [
-      "messages",
-      connection.id,
-      topic,
-      offset,
-      limit,
-      partition,
-      avroDecode,
-    ],
-    queryFn: async (): Promise<KafkaMessage[]> => {
-      try {
-        const result = await queryMessages({
-          connectionId: connection.id!,
+  const { data, isLoading, isError, error, refetch } = useQuery<KafkaMessage[]>(
+    {
+      queryKey: [
+        "messages",
+        connection.id,
+        topic,
+        offset,
+        limit,
+        partition,
+        avroDecode,
+      ],
+      queryFn: async (): Promise<KafkaMessage[]> => {
+        console.log("Query function called with:", {
+          connectionId: connection.id,
           topic,
           offset,
           limit,
           partition,
           avroDecode,
         });
-        const messages = (result ?? []) as KafkaMessage[];
-        return messages;
-      } catch (err) {
-        throw err;
-      }
-    },
-    enabled: true,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+        try {
+          const result = await queryMessages({
+            connectionId: connection.id!,
+            topic,
+            offset,
+            limit,
+            partition,
+            avroDecode,
+          });
+          const messages = (result ?? []) as KafkaMessage[];
+          console.log(`Query returned ${messages.length} messages`);
+          return messages;
+        } catch (err) {
+          console.error("Query error:", err);
+          throw err;
+        }
+      },
+      enabled: !!connection.id && !!topic && connection.connected,
+      staleTime: 0, // Always refetch when queryKey changes
+      refetchOnMount: true,
+      refetchOnWindowFocus: false,
+      gcTime: 0, // Don't cache results
+    }
+  );
+
+  // Invalidate and refetch when offset changes
+  useEffect(() => {
+    console.log(
+      "Offset changed to:",
+      offset,
+      "Current data length:",
+      data?.length
+    );
+    if (connection.id && topic && connection.connected && offset) {
+      const queryKey = [
+        "messages",
+        connection.id,
+        topic,
+        offset,
+        limit,
+        partition,
+        avroDecode,
+      ];
+      console.log("Invalidating query cache and refetching...", { queryKey });
+      queryClient.invalidateQueries({ queryKey });
+      refetch();
+    }
+  }, [
+    offset,
+    connection.id,
+    topic,
+    connection.connected,
+    limit,
+    partition,
+    avroDecode,
+    queryClient,
+    refetch,
+    data?.length,
+  ]);
 
   if (isLoading) {
     return (
@@ -162,24 +213,37 @@ export default function Messages(props: Props) {
             variant="default"
             size="sm"
             className="bg-black hover:bg-black/90"
+            onClick={() => refetch()}
+            disabled={isLoading || !connection.connected}
           >
             <Play className="size-4 mr-2" />
-            Consume
+            {isLoading ? "Loading..." : "Consume"}
           </Button>
 
           <FilterMessages
             connection={connection}
             topic={topic}
+            offset={offset}
+            limit={limit}
+            partition={partition}
+            avroDecode={avroDecode}
             onChange={(
-              offset: string,
-              limit: string,
-              partition: "all" | number,
-              avroDecode: boolean
+              newOffset: string,
+              newLimit: string,
+              newPartition: "all" | number,
+              newAvroDecode: boolean
             ) => {
-              setOffset(offset);
-              setLimit(limit);
-              setPartition(partition);
-              setAvroDecode(avroDecode);
+              console.log("FilterMessages onChange called:", {
+                newOffset,
+                newLimit,
+                newPartition,
+                newAvroDecode,
+                currentOffset: offset,
+              });
+              setOffset(newOffset);
+              setLimit(newLimit);
+              setPartition(newPartition);
+              setAvroDecode(newAvroDecode);
             }}
           />
 
@@ -210,15 +274,28 @@ export default function Messages(props: Props) {
 
           <div className="flex-1 overflow-y-auto">
             {data && data.length > 0 ? (
-              data.map((message) => {
-                return (
-                  <Message
-                    key={`${message.partition}-${message.offset}-${topic}`}
-                    onClick={() => setSelectedMessage(message)}
-                    message={message}
-                  />
-                );
-              })
+              (() => {
+                // Sort messages: for "latest", show newest first (highest offset first)
+                // For "earliest", show oldest first (lowest offset first)
+                const sortedMessages = [...data].sort((a, b) => {
+                  if (offset === "latest") {
+                    // Latest: sort by offset descending (newest first)
+                    return b.offset - a.offset;
+                  } else {
+                    // Earliest: sort by offset ascending (oldest first)
+                    return a.offset - b.offset;
+                  }
+                });
+                return sortedMessages.map((message) => {
+                  return (
+                    <Message
+                      key={`${message.partition}-${message.offset}-${topic}`}
+                      onClick={() => setSelectedMessage(message)}
+                      message={message}
+                    />
+                  );
+                });
+              })()
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 No messages found
