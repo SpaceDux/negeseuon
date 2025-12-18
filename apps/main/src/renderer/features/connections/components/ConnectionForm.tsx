@@ -147,7 +147,6 @@ export function ConnectionForm({
       return testConnection(config);
     },
     onSuccess: (value) => {
-      console.log(value);
       if (value.success) {
         toast.success("Connection test successful", { description: value.message });
       } else {

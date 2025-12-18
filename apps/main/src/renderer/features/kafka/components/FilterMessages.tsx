@@ -60,10 +60,6 @@ export default function FilterMessages(props: Props) {
   }, [propAvroDecode]);
 
   const handleOffsetChange = (value: string) => {
-    console.log("FilterMessages handleOffsetChange:", {
-      oldValue: offset,
-      newValue: value,
-    });
     setOffset(value);
     onChange(value, limit, partition, avroDecode);
   };

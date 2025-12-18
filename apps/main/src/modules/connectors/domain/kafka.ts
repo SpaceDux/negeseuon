@@ -340,7 +340,6 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
       );
       if (!offsetsError && offsetsResult) {
         latestOffsets = offsetsResult;
-        console.log(`Latest offsets for ${topic}:`, latestOffsets);
       }
     } catch (error) {
       console.warn(
@@ -396,10 +395,6 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
           }
         }
 
-        console.log(
-          `Latest mode: partition ${partition}, latestOffset: ${latestOffset}, startOffset: ${startOffset}, limit: ${numericLimit}`
-        );
-
         offsets = [
           {
             topic,
@@ -432,11 +427,6 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
               latestOffsets?.get(topic)?.[offset.partition] ?? 0n;
             return latestOffset > 0n;
           });
-
-        console.log(
-          `Latest mode: all partitions, calculated offsets:`,
-          offsets
-        );
       }
     } else if (normalizedOffset === "committed") {
       // Use committed mode for committed offset
@@ -465,20 +455,11 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
     // Get the latest offset for the target partition
     // Latest offset is exclusive (next offset to be written), so last message is at latestOffset - 1
     const latestOffset = latestOffsets?.get(topic)?.[targetPartition] ?? null;
-    console.log(
-      `Latest offset for ${topic} partition ${targetPartition}:`,
-      latestOffset,
-      latestOffset !== null
-        ? `(last message at offset ${latestOffset - 1n})`
-        : ""
-    );
 
     // Create the consumer stream
     // Set maxFetches to limit how many fetch operations the stream performs
     // This helps the stream stop after collecting messages instead of waiting indefinitely
     const maxFetches = Math.ceil(numericLimit / 10) || 1; // Rough estimate: ~10 messages per fetch
-
-    console.log(`Consuming with mode: ${mode}, offsets:`, offsets);
 
     // If we're using manual mode but have no valid offsets, return empty array
     if (mode === "manual" && (!offsets || offsets.length === 0)) {
@@ -500,12 +481,6 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
 
     if (offsets && offsets.length > 0) {
       consumeOptions.offsets = offsets;
-      console.log(
-        `Using manual offsets:`,
-        JSON.stringify(offsets, (key, value) =>
-          typeof value === "bigint" ? value.toString() : value
-        )
-      );
     }
 
     const [stream, streamError] = await safeAsync(() =>
@@ -520,13 +495,6 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
     if (!stream) {
       throw new Error("Failed to create consumer stream");
     }
-
-    console.log(
-      "Consumer stream created successfully, starting to read messages..."
-    );
-    console.log(
-      `Stream details: mode=${mode}, hasOffsets=${!!offsets && offsets.length > 0}`
-    );
 
     const messages: Array<{
       topic: string;
@@ -545,14 +513,9 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
     const timeout = 30000; // 30 second timeout
 
     try {
-      console.log("Entering message consumption loop...");
       for await (const message of stream!) {
         messageCount++;
         const elapsed = Date.now() - startTime;
-        console.log(
-          `Received message ${messageCount} after ${elapsed}ms: partition=${message.partition}, offset=${message.offset}`
-        );
-        console.dir(message, { depth: null });
 
         // Check for timeout
         if (elapsed > timeout) {
@@ -562,9 +525,6 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
         }
 
         if (partition !== undefined && message.partition !== partition) {
-          console.log(
-            `Skipping message from partition ${message.partition} (requested: ${partition})`
-          );
           continue;
         }
 
@@ -590,19 +550,13 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
           headers: headersObj,
         });
 
-        console.log(
-          `Collected ${messages.length} messages, current offset: ${message.offset}, latest: ${latestOffset}`
-        );
-
         // Check if we've reached the limit
         if (messages.length >= numericLimit) {
-          console.log(`Reached limit of ${numericLimit} messages, breaking`);
           shouldBreak = true;
           // Close stream immediately to stop it from waiting for more messages
           try {
             await stream!.close();
             streamClosed = true;
-            console.log("Stream closed after reaching limit");
           } catch (closeError) {
             console.error("Error closing stream:", closeError);
           }
@@ -618,35 +572,26 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
           message.partition === targetPartition &&
           message.offset >= latestOffset - 1n
         ) {
-          console.log(
-            `Reached last available message at offset ${message.offset} (latest: ${latestOffset}), breaking`
-          );
           shouldBreak = true;
           // Close stream immediately to stop it from waiting for more messages
           try {
             await stream!.close();
             streamClosed = true;
-            console.log("Stream closed after reaching latest offset");
           } catch (closeError) {
             console.error("Error closing stream:", closeError);
           }
           break;
         }
       }
-      console.log(
-        `Finished consuming stream, collected ${messages.length} messages`
-      );
     } catch (error) {
       console.error("Error consuming stream:", error);
       throw error;
     } finally {
       // Always close the stream
       if (!streamClosed) {
-        console.log("Closing stream...");
         try {
           await stream!.close();
           streamClosed = true;
-          console.log("Stream closed");
         } catch (closeError) {
           console.error("Error closing stream:", closeError);
         }
@@ -659,9 +604,6 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
       );
     }
 
-    console.log(
-      `Returning ${messages.length} messages from queryMessages (mode: ${mode}, requested limit: ${numericLimit})`
-    );
     if (messages.length === 0) {
       console.warn(
         `No messages returned! Mode: ${mode}, Offsets: ${JSON.stringify(
@@ -678,7 +620,6 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
         }`
       );
     }
-    console.dir(messages, { depth: null });
     return messages as any;
   }
 }

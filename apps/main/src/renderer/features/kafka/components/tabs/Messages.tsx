@@ -40,14 +40,6 @@ export default function Messages(props: Props) {
         avroDecode,
       ],
       queryFn: async (): Promise<KafkaMessage[]> => {
-        console.log("Query function called with:", {
-          connectionId: connection.id,
-          topic,
-          offset,
-          limit,
-          partition,
-          avroDecode,
-        });
         try {
           const result = await queryMessages({
             connectionId: connection.id!,
@@ -58,7 +50,6 @@ export default function Messages(props: Props) {
             avroDecode,
           });
           const messages = (result ?? []) as KafkaMessage[];
-          console.log(`Query returned ${messages.length} messages`);
           return messages;
         } catch (err) {
           console.error("Query error:", err);
@@ -75,12 +66,6 @@ export default function Messages(props: Props) {
 
   // Invalidate and refetch when offset changes
   useEffect(() => {
-    console.log(
-      "Offset changed to:",
-      offset,
-      "Current data length:",
-      data?.length
-    );
     if (connection.id && topic && connection.connected && offset) {
       const queryKey = [
         "messages",
@@ -91,7 +76,6 @@ export default function Messages(props: Props) {
         partition,
         avroDecode,
       ];
-      console.log("Invalidating query cache and refetching...", { queryKey });
       queryClient.invalidateQueries({ queryKey });
       refetch();
     }
@@ -233,13 +217,6 @@ export default function Messages(props: Props) {
               newPartition: "all" | number,
               newAvroDecode: boolean
             ) => {
-              console.log("FilterMessages onChange called:", {
-                newOffset,
-                newLimit,
-                newPartition,
-                newAvroDecode,
-                currentOffset: offset,
-              });
               setOffset(newOffset);
               setLimit(newLimit);
               setPartition(newPartition);

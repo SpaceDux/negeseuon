@@ -260,14 +260,6 @@ export function createConnectorsRouter(dependencies: Dependencies) {
             );
           }
 
-          // Log first message for debugging
-          if (transformed.length > 0) {
-            console.log(
-              "First transformed message:",
-              JSON.stringify(transformed[0], null, 2)
-            );
-          }
-
           return transformed;
         } catch (error) {
           console.error("Error in queryMessages procedure:", error);
