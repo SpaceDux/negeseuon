@@ -49,7 +49,7 @@ export interface BrokerOperations {
    * @param offset The offset to start from
    * @param limit The maximum number of messages to return
    * @param partition The partition to query
-   * @param avroDecode Whether to decode the messages as Avro
+   * @param schemaRegistryDecode Whether to decode the messages as Schema Registry
    * @returns The messages
    */
   queryMessages?(args: {
@@ -57,7 +57,7 @@ export interface BrokerOperations {
     offset?: string;
     limit?: string;
     partition?: number;
-    avroDecode?: boolean;
+    schemaRegistryDecode?: boolean;
   }): Promise<Message<any, any, any, any>[]>;
 
   // Add more broker-specific operations as needed

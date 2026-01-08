@@ -9,14 +9,14 @@ export default function useMessages() {
     offset,
     limit,
     partition,
-    avroDecode,
+    schemaRegistryDecode,
   }: {
     connectionId: number;
     topic: string;
     offset: string;
     limit: string;
     partition: number | "all";
-    avroDecode: boolean;
+    schemaRegistryDecode: boolean;
   }) => {
     try {
       const queryPromise = await client.connectors.queryMessages.query({
@@ -25,7 +25,7 @@ export default function useMessages() {
         offset,
         limit,
         partition: partition === "all" ? undefined : partition,
-        avroDecode,
+        schemaRegistryDecode,
       });
 
       const messages = (queryPromise ?? []) as any[];

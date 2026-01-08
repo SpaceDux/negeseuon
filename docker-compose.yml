@@ -87,7 +87,7 @@ services:
       echo 'key-3|{\"id\":3,\"message\":\"Batch message 3\",\"timestamp\":\"2024-01-01T00:00:02Z\",\"source\":\"docker-compose\"}' >> /tmp/topic1-messages.txt
       echo 'key-4|{\"id\":4,\"message\":\"Batch message 4\",\"timestamp\":\"2024-01-01T00:00:03Z\",\"source\":\"docker-compose\"}' >> /tmp/topic1-messages.txt
       echo 'key-5|{\"id\":5,\"message\":\"Batch message 5\",\"timestamp\":\"2024-01-01T00:00:04Z\",\"source\":\"docker-compose\"}' >> /tmp/topic1-messages.txt
-      cat /tmp/topic1-messages.txt | kafka-console-producer --bootstrap-server kafka:9094 --topic topic-1 --producer.config /tmp/client.properties --property parse.key=true --property key.separator=|
+      cat /tmp/topic1-messages.txt | kafka-console-producer --bootstrap-server kafka:9094 --topic topic-1 --producer.config /tmp/client.properties --property parse.key=true --property key.separator='|'
 
       # Produce batch messages to topic-2
       echo 'Producing messages to topic-2...'
@@ -96,7 +96,7 @@ services:
       echo 'key-3|{\"id\":3,\"message\":\"Topic 2 message 3\",\"timestamp\":\"2024-01-01T00:00:02Z\",\"source\":\"docker-compose\"}' >> /tmp/topic2-messages.txt
       echo 'key-4|{\"id\":4,\"message\":\"Topic 2 message 4\",\"timestamp\":\"2024-01-01T00:00:03Z\",\"source\":\"docker-compose\"}' >> /tmp/topic2-messages.txt
       echo 'key-5|{\"id\":5,\"message\":\"Topic 2 message 5\",\"timestamp\":\"2024-01-01T00:00:04Z\",\"source\":\"docker-compose\"}' >> /tmp/topic2-messages.txt
-      cat /tmp/topic2-messages.txt | kafka-console-producer --bootstrap-server kafka:9094 --topic topic-2 --producer.config /tmp/client.properties --property parse.key=true --property key.separator=|
+      cat /tmp/topic2-messages.txt | kafka-console-producer --bootstrap-server kafka:9094 --topic topic-2 --producer.config /tmp/client.properties --property parse.key=true --property key.separator='|'
 
       echo 'Batch messages produced successfully!'
       "

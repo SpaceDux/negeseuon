@@ -196,14 +196,14 @@ export class ConnectorService {
     offset,
     limit,
     partition,
-    avroDecode,
+    schemaRegistryDecode,
   }: {
     connectionId: number;
     topic: string;
     offset: string;
     limit: string;
     partition: number | null;
-    avroDecode: boolean;
+    schemaRegistryDecode: boolean;
   }): Promise<Message[]> {
     const connector = this.dependencies.orchestrator.getConnector(connectionId);
     if (!connector) {
@@ -225,7 +225,7 @@ export class ConnectorService {
       topic,
       offset,
       limit,
-      avroDecode,
+      schemaRegistryDecode,
     });
   }
   /**

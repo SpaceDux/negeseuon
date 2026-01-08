@@ -18,11 +18,12 @@ type Props = {
 
 export default function Messages(props: Props) {
   const { topic, connection } = props;
+  const [schemaRegistryDecode, setSchemaRegistryDecode] =
+    useState<boolean>(false);
   const { queryMessages } = useMessages();
   const queryClient = useQueryClient();
   const [offset, setOffset] = useState<string>("earliest");
   const [limit, setLimit] = useState<string>("100");
-  const [avroDecode, setAvroDecode] = useState<boolean>(false);
   const [partition, setPartition] = useState<number | "all">("all");
   const [selectedMessage, setSelectedMessage] = useState<KafkaMessage | null>(
     null
@@ -37,7 +38,7 @@ export default function Messages(props: Props) {
         offset,
         limit,
         partition,
-        avroDecode,
+        schemaRegistryDecode,
       ],
       queryFn: async (): Promise<KafkaMessage[]> => {
         try {
@@ -47,7 +48,7 @@ export default function Messages(props: Props) {
             offset,
             limit,
             partition,
-            avroDecode,
+            schemaRegistryDecode,
           });
           const messages = (result ?? []) as KafkaMessage[];
           return messages;
@@ -74,7 +75,7 @@ export default function Messages(props: Props) {
         offset,
         limit,
         partition,
-        avroDecode,
+        schemaRegistryDecode,
       ];
       queryClient.invalidateQueries({ queryKey });
       refetch();
@@ -86,7 +87,7 @@ export default function Messages(props: Props) {
     connection.connected,
     limit,
     partition,
-    avroDecode,
+    schemaRegistryDecode,
     queryClient,
     refetch,
     data?.length,
@@ -210,17 +211,17 @@ export default function Messages(props: Props) {
             offset={offset}
             limit={limit}
             partition={partition}
-            avroDecode={avroDecode}
+            schemaRegistryDecode={schemaRegistryDecode}
             onChange={(
               newOffset: string,
               newLimit: string,
               newPartition: "all" | number,
-              newAvroDecode: boolean
+              newSchemaRegistryDecode: boolean
             ) => {
               setOffset(newOffset);
               setLimit(newLimit);
               setPartition(newPartition);
-              setAvroDecode(newAvroDecode);
+              setSchemaRegistryDecode(newSchemaRegistryDecode);
             }}
           />
 

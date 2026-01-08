@@ -60,10 +60,10 @@ export default function Message(props: Props) {
                   key: {message.key}
                 </span>
               </div>
-              <div className="mt-1 text-xs text-muted-foreground">
+              <div className="mt-1 text-xs text-muted-foreground float-left">
                 {!isExpanded && (
                   <span className="font-mono">
-                    {formatPayload(message.payload).substring(0, 80)}
+                    {formatPayload(message.payload).substring(0, 100)}
                     ...
                   </span>
                 )}

@@ -452,14 +452,30 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
       ];
     }
 
-    // Get the latest offset for the target partition
+    // Get the latest offset for the target partition (or all partitions if reading from all)
     // Latest offset is exclusive (next offset to be written), so last message is at latestOffset - 1
     const latestOffset = latestOffsets?.get(topic)?.[targetPartition] ?? null;
+
+    // When reading from all partitions, we need to check latest offset for each partition
+    // Create a map of partition -> latestOffset for quick lookup
+    const partitionLatestOffsets = new Map<number, bigint>();
+    if (partition === undefined && latestOffsets) {
+      const topicOffsets = latestOffsets.get(topic);
+      if (topicOffsets) {
+        partitionsToQuery.forEach((p) => {
+          const offset = topicOffsets[p];
+          if (offset !== undefined) {
+            partitionLatestOffsets.set(p, offset);
+          }
+        });
+      }
+    }
 
     // Create the consumer stream
     // Set maxFetches to limit how many fetch operations the stream performs
     // This helps the stream stop after collecting messages instead of waiting indefinitely
-    const maxFetches = Math.ceil(numericLimit / 10) || 1; // Rough estimate: ~10 messages per fetch
+    // Use a more aggressive limit to exit earlier - cap at 5 fetches max
+    const maxFetches = Math.min(Math.ceil(numericLimit / 20) || 1, 5);
 
     // If we're using manual mode but have no valid offsets, return empty array
     if (mode === "manual" && (!offsets || offsets.length === 0)) {
@@ -510,14 +526,14 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
     let shouldBreak = false;
     let messageCount = 0;
     const startTime = Date.now();
-    const timeout = 30000; // 30 second timeout
+    const timeout = 5000; // 5 second timeout - exit early if no messages
 
     try {
       for await (const message of stream!) {
         messageCount++;
         const elapsed = Date.now() - startTime;
 
-        // Check for timeout
+        // Check for timeout - exit early if taking too long
         if (elapsed > timeout) {
           console.warn(`Timeout reached after ${elapsed}ms, breaking`);
           shouldBreak = true;
@@ -567,11 +583,35 @@ export class KafkaConnector extends Connector<KafkaConfiguration> {
         // The latest offset is exclusive (it's the next offset to be written)
         // So the last available message is at latestOffset - 1
         // We stop when current offset >= latestOffset - 1 (i.e., we've read the last message)
-        if (
-          latestOffset !== null &&
-          message.partition === targetPartition &&
-          message.offset >= latestOffset - 1n
-        ) {
+        let hasReachedEnd = false;
+        if (partition !== undefined) {
+          // Reading from a specific partition: check targetPartition's latest offset
+          if (
+            latestOffset !== null &&
+            message.partition === targetPartition &&
+            message.offset >= latestOffset - 1n
+          ) {
+            hasReachedEnd = true;
+          }
+        } else {
+          // Reading from all partitions: check the current message's partition's latest offset
+          const partitionLatestOffset = partitionLatestOffsets.get(
+            message.partition
+          );
+          if (
+            partitionLatestOffset !== undefined &&
+            message.offset >= partitionLatestOffset - 1n
+          ) {
+            // Mark this partition as fully read
+            partitionLatestOffsets.delete(message.partition);
+            // Only break if all partitions have been fully read
+            if (partitionLatestOffsets.size === 0) {
+              hasReachedEnd = true;
+            }
+          }
+        }
+
+        if (hasReachedEnd) {
           shouldBreak = true;
           // Close stream immediately to stop it from waiting for more messages
           try {

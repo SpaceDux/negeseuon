@@ -18,12 +18,12 @@ type Props = {
   offset?: string;
   limit?: string;
   partition?: "all" | number;
-  avroDecode?: boolean;
+  schemaRegistryDecode?: boolean;
   onChange: (
     offset: string,
     limit: string,
     partition: "all" | number,
-    avroDecode: boolean
+    schemaRegistryDecode: boolean
   ) => void;
 };
 export default function FilterMessages(props: Props) {
@@ -34,15 +34,15 @@ export default function FilterMessages(props: Props) {
     offset: propOffset,
     limit: propLimit,
     partition: propPartition,
-    avroDecode: propAvroDecode,
+    schemaRegistryDecode: propSchemaRegistryDecode,
   } = props;
   const [offset, setOffset] = useState<string>(propOffset ?? "earliest");
   const [limit, setLimit] = useState<string>(propLimit ?? "100");
   const [partition, setPartition] = useState<"all" | number>(
     propPartition ?? "all"
   );
-  const [avroDecode, setAvroDecode] = useState<boolean>(
-    propAvroDecode ?? false
+  const [schemaRegistryDecode, setSchemaRegistryDecode] = useState<boolean>(
+    propSchemaRegistryDecode ?? false
   );
 
   // Sync with props when they change
@@ -56,26 +56,27 @@ export default function FilterMessages(props: Props) {
     if (propPartition !== undefined) setPartition(propPartition);
   }, [propPartition]);
   useEffect(() => {
-    if (propAvroDecode !== undefined) setAvroDecode(propAvroDecode);
-  }, [propAvroDecode]);
+    if (propSchemaRegistryDecode !== undefined)
+      setSchemaRegistryDecode(propSchemaRegistryDecode);
+  }, [propSchemaRegistryDecode]);
 
   const handleOffsetChange = (value: string) => {
     setOffset(value);
-    onChange(value, limit, partition, avroDecode);
+    onChange(value, limit, partition, schemaRegistryDecode);
   };
 
   const handleLimitChange = (value: string) => {
     setLimit(value);
-    onChange(offset, value, partition, avroDecode);
+    onChange(offset, value, partition, schemaRegistryDecode);
   };
 
   const handlePartitionChange = (value: "all" | number) => {
     setPartition(value);
-    onChange(offset, limit, value, avroDecode);
+    onChange(offset, limit, value, schemaRegistryDecode);
   };
 
-  const handleAvroDecodeChange = (value: boolean) => {
-    setAvroDecode(value);
+  const handleSchemaRegistryDecodeChange = (value: boolean) => {
+    setSchemaRegistryDecode(value);
     onChange(offset, limit, partition, value);
   };
 
@@ -121,13 +122,13 @@ export default function FilterMessages(props: Props) {
       <div className="flex items-center gap-2">
         <Checkbox
           id="avro-decode"
-          checked={avroDecode}
+          checked={schemaRegistryDecode}
           onCheckedChange={(checked: boolean) =>
-            handleAvroDecodeChange(checked)
+            handleSchemaRegistryDecodeChange(checked)
           }
         />
         <Label htmlFor="avro-decode" className="text-sm cursor-pointer">
-          Avro Decode
+          Schema Registry Decode
         </Label>
       </div>
     </>

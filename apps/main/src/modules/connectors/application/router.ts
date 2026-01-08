@@ -118,22 +118,28 @@ export function createConnectorsRouter(dependencies: Dependencies) {
             offset: v.string(),
             limit: v.string(),
             partition: v.optional(v.number()),
-            avroDecode: v.boolean(),
+            schemaRegistryDecode: v.boolean(),
           })
         )
       )
       .output(wrap(v.array(KafkaMessageSchema)))
       .query(async ({ input }) => {
         try {
-          const { connectionId, topic, offset, limit, partition, avroDecode } =
-            input;
+          const {
+            connectionId,
+            topic,
+            offset,
+            limit,
+            partition,
+            schemaRegistryDecode,
+          } = input;
           const messages = await dependencies.connectorService.queryMessages({
             connectionId,
             topic,
             offset,
             limit,
             partition: partition ? Number(partition) : null,
-            avroDecode,
+            schemaRegistryDecode,
           });
 
           // Transform Message objects to KafkaMessageSchema format
