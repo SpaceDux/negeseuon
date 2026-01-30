@@ -6,6 +6,7 @@ import { TabProvider, useTabs } from "@renderer/libs/hooks/useTabs";
 import { useRegisterTabTypes } from "@renderer/libs/hooks/registerTabTypes";
 import { Toaster } from "@renderer/libs/shadcn/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider } from "@renderer/libs/ThemeContext";
 import { ConnectionManagerProvider } from "@renderer/features/connections/context";
 import { TopicMetadataProvider } from "@renderer/features/kafka/context";
 
@@ -36,14 +37,16 @@ function App() {
   return (
     <StrictMode>
       <QueryClientProvider client={queryClient}>
-        <ConnectionManagerProvider>
-          <TopicMetadataProvider>
-            <TabProvider>
-              <AppContent />
-              <Toaster />
-            </TabProvider>
-          </TopicMetadataProvider>
-        </ConnectionManagerProvider>
+        <ThemeProvider>
+          <ConnectionManagerProvider>
+            <TopicMetadataProvider>
+              <TabProvider>
+                <AppContent />
+                <Toaster />
+              </TabProvider>
+            </TopicMetadataProvider>
+          </ConnectionManagerProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </StrictMode>
   );
